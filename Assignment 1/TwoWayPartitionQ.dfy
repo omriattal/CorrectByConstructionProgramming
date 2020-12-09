@@ -71,13 +71,16 @@ method TwoWayPartition0(a: array<int>, ghost A: multiset<int>)
 	ensures Sorted(a[..]) && multiset(a[..]) == multiset(old(a[..]))
 	modifies a
 {
+    // strengthen postcondition
+    ghost var q := a[..];// pre with substitution of the contents of "a" with the initial contents (backed-up in "q")
     TwoWayPartition1(a, A);
-    LemmaStrengthen(a, A);
+    LemmaStrengthen(a, q, A);// "q" here acts as backup for "old(a[..])"
 }
 
-lemma LemmaStrengthen(a: array<int>, A: multiset<int>)
+lemma LemmaStrengthen(a: array<int>, q: seq<int>, A: multiset<int>)
+    requires A == multiset(q)
     requires Sorted(a[..]) && multiset(a[..]) == A
-    ensures Sorted(a[..]) && multiset(a[..]) == multiset(old(a[..]))
+    ensures Sorted(a[..]) && multiset(a[..]) == multiset(q)
 {}
 
 method TwoWayPartition1(a: array<int>, ghost A: multiset<int>)
