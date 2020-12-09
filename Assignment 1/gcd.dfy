@@ -1,15 +1,4 @@
-predicate CommonDivisor(a: nat, b: nat, c: nat)
-{
-	c > 0 && a%c == b%c == 0
-}
-
-predicate GreatestCommonDivisor(a: nat, b: nat, c: nat)
-{
-	CommonDivisor(a, b, c) &&
-	forall d: nat :: CommonDivisor(a, b, d) ==> d <= c
-}
-
-method {: verify false} ComputeGCD'(a: nat, b: nat) returns (i: nat)//verify false*******************
+method {: verify false} ComputeGCD'(a: nat, b: nat) returns (i: nat)
 {
 	if a<=b
 	{
@@ -26,6 +15,16 @@ method {: verify false} ComputeGCD'(a: nat, b: nat) returns (i: nat)//verify fal
 		i := i-1;
 	}
 }
+predicate CommonDivisor(a: nat, b: nat, c: nat)
+{
+	c > 0 && a%c == b%c == 0
+}
+
+predicate GreatestCommonDivisor(a: nat, b: nat, c: nat)
+{
+	CommonDivisor(a, b, c) &&
+	forall d: nat :: CommonDivisor(a, b, d) ==> d <= c
+}
 
 method ComputeGCD(a: nat, b: nat) returns (i: nat)
 	requires a > 0 && b > 0 //pre
@@ -38,7 +37,7 @@ method ComputeGCD(a: nat, b: nat) returns (i: nat)
 }
 
 lemma LemmaStrengthenPostcondition(a: nat, b: nat, i: nat)
-	requires Inv(a, b, i) && Guard(a, b, i) //post'
+	requires Inv(a, b, i) && !Guard(a, b, i) //post'
 	ensures GreatestCommonDivisor(a, b, i) //post
 {}
 
@@ -49,10 +48,7 @@ predicate Inv(a: nat, b: nat, i: nat)
 
 predicate method Guard (a: nat, b: nat, i: nat)
 {
-	//CommonDivisor(a, b, i) - we could not use this predicate,
-	//because it is only  a predicate and not a predicate method.
-	//since the game do not allow us to change it, we left it this way...
-	i > 0 && a%i == b%i == 0 
+	!(i > 0 && a%i == b%i == 0)  
 }
 
 predicate method Guard2(a: nat, b: nat)
@@ -96,7 +92,6 @@ method equalB(a: nat, b: nat) returns (i: nat)
 	LemmaEqB(a, b, i);
 	i := b;
 }
-
 lemma LemmaEqB(a: nat, b: nat, i: nat)
 	requires a > 0 && b > 0 && !Guard2(a, b)
 	ensures Inv(a, b, b)
@@ -104,11 +99,11 @@ lemma LemmaEqB(a: nat, b: nat, i: nat)
 
 method ComputeGCD2(a: nat, b: nat, i0: nat) returns (i: nat)
 	requires Inv(a, b, i0)//mid
-	ensures Inv(a, b, i) && Guard(a, b, i) //post'
+	ensures Inv(a, b, i) && !Guard(a, b, i) //post'
 {
 	i := i0;
 	// iteration
-	while !Guard(a, b, i)
+	while Guard(a, b, i)
 		invariant Inv(a, b, i)
 		decreases i
 	{
@@ -117,7 +112,7 @@ method ComputeGCD2(a: nat, b: nat, i0: nat) returns (i: nat)
 }
 
 method updateI(a: nat, b:nat, i0: nat) returns (i: nat)
-	requires Inv(a, b, i0) && !Guard(a, b, i0) 
+	requires Inv(a, b, i0) && Guard(a, b, i0) 
 	ensures Inv(a, b, i) && 0<=i<i0
 {
 	i := i0;
@@ -127,15 +122,9 @@ method updateI(a: nat, b:nat, i0: nat) returns (i: nat)
 }
 
 lemma LemmaUpdateI(a: nat, b: nat, i: nat)
-	requires Inv(a, b, i) && !Guard(a, b, i) 
+	requires Inv(a, b, i) && Guard(a, b, i) 
 	ensures Inv(a, b, i-1) && 0<=i-1<i
-{
-	/* We may think on a situation in which i=0, and then 0<=-1<0 equal false, BUT it will never happen!
-	Because i initialized with b>0, and since i=i-1 in each iteration, the minimun value i can get is 1.
-	The reason for that is: for all tow natural numbers x,y : CommonDivisor(x,y,1) is true.
-	It mean that our loop guard will equal false and we won't get to this update.
-	Dafny failed to get it - we solved it by making Inv(a, b, i) stronger and ask for i>0. */ 
-} 
+{} 
 
 method Main() {
 	var x := ComputeGCD(8, 12);

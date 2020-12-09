@@ -1,3 +1,27 @@
+method TwoWayPartition'(a: array<int>)
+    requires ZeroesAndOnesOnly(a[..])
+	ensures Sorted(a[..])
+	ensures multiset(a[..]) == multiset(old(a[..]))
+	modifies a
+{
+    ghost var A := multiset(a[..]);
+    var i, j := 0, 0;
+
+    while j != a.Length    
+        invariant Inv(a[..], A, i, j)
+        decreases a.Length-j
+    {
+        if a[j]==0
+        {
+            a[i], a[j], i, j := a[j], a[i], i+1, j+1;
+        }
+        else
+        {
+            j := j+1;
+        }
+    }
+}
+
 predicate Sorted(q: seq<int>)
 {
 	forall i,j :: 0 <= i <= j < |q| ==> q[i] <= q[j]
@@ -29,29 +53,6 @@ predicate method Guard(a: array<int>,ghost A: multiset<int>, i:nat, j:nat)
 {
     j != a.Length    
 }
-method TwoWayPartition'(a: array<int>)
-    requires ZeroesAndOnesOnly(a[..])
-	ensures Sorted(a[..])
-	ensures multiset(a[..]) == multiset(old(a[..]))
-	modifies a
-{
-    ghost var A := multiset(a[..]);
-    var i, j := 0, 0;
-
-    while j != a.Length    
-        invariant Inv(a[..], A, i, j)
-        decreases a.Length-j
-    {
-        if a[j]==0
-        {
-            a[i], a[j], i, j := a[j], a[i], i+1, j+1;
-        }
-        else
-        {
-            j := j+1;
-        }
-    }
-}
 
 // implement with linear worst-case time complexity (in the length of the array)
 method TwoWayPartition(a: array<int>)
@@ -71,16 +72,25 @@ method TwoWayPartition0(a: array<int>, ghost A: multiset<int>)
 	modifies a
 {
     // strengthen postcondition
-    ghost var q := a[..];// pre with substitution of the contents of "a" with the initial contents (backed-up in "q")
+    // ghost var q := a[..];// pre with substitution of the contents of "a" with the initial contents (backed-up in "q")
+    // TwoWayPartition1(a, A);
+    // LemmaStrengthen(a, q, A);// "q" here acts as backup for "old(a[..])"
+
     TwoWayPartition1(a, A);
-    LemmaStrengthen(a, q, A);// "q" here acts as backup for "old(a[..])"
+    LemmaStrengthen(a, A);// "q" here acts as backup for "old(a[..])"
 }
 
-lemma LemmaStrengthen(a: array<int>, q: seq<int>, A: multiset<int>)
-    requires A == multiset(q)
+lemma LemmaStrengthen(a: array<int>, A: multiset<int>)
     requires Sorted(a[..]) && multiset(a[..]) == A
     ensures Sorted(a[..]) && multiset(a[..]) == multiset(old(a[..]))
 {}
+
+
+// lemma LemmaStrengthen(a: array<int>, q: seq<int>, A: multiset<int>)
+//     requires A == multiset(q)
+//     requires Sorted(a[..]) && multiset(a[..]) == A
+//     ensures Sorted(a[..]) && multiset(a[..]) == multiset(old(a[..]))
+// {}
 
 method TwoWayPartition1(a: array<int>, ghost A: multiset<int>)
     requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..])
