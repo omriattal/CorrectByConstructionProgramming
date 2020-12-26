@@ -44,7 +44,7 @@ predicate OnesOnly(q: seq<int>)
 
 predicate Inv(q: seq<int>, A: multiset<int>, i: nat, j: nat)
 {
-    i<=j<=|q| && ZeroesOnly(q[..i]) && OnesOnly(q[i..j]) && multiset(q) == A && ZeroesAndOnesOnly(q)
+    i<=j<=|q| && ZeroesAndOnesOnly(q) && multiset(q) == A && ZeroesOnly(q[..i]) && OnesOnly(q[i..j])  
 }
 
 predicate method Guard(a: array<int>,ghost A: multiset<int>, i:nat, j:nat)
@@ -67,22 +67,25 @@ method TwoWayPartition(a: array<int>)
 }
 
 method TwoWayPartition0(a: array<int>, ghost A: multiset<int>)
-    requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..])
-	ensures Sorted(a[..]) && multiset(a[..]) == multiset(old(a[..]))
+    requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..]) //pre
+	ensures Sorted(a[..]) && multiset(a[..]) == multiset(old(a[..])) //post
 	modifies a
 {
+    // strengthen postcondition
+    ghost var q := a[..];
     TwoWayPartition1(a, A);
-    LemmaStrengthen(a, A);
+    LemmaStrengthen(a, q, A);// "q" here acts as backup for "old(a[..])"
 }
 
-lemma LemmaStrengthen(a: array<int>, A: multiset<int>)
-    requires Sorted(a[..]) && multiset(a[..]) == A
-    ensures Sorted(a[..]) && multiset(a[..]) == multiset(old(a[..]))
+lemma LemmaStrengthen(a: array<int>, q: seq<int>, A: multiset<int>)
+    requires ZeroesAndOnesOnly(q) && A == multiset(q) //pre[w\w0]
+    requires Sorted(a[..]) && multiset(a[..]) == A //post'
+    ensures Sorted(a[..]) && multiset(a[..]) == multiset(q) //post 
 {}
 
 method TwoWayPartition1(a: array<int>, ghost A: multiset<int>)
-    requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..])
-	ensures Sorted(a[..]) && multiset(a[..]) == A
+    requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..]) //pre
+	ensures Sorted(a[..]) && multiset(a[..]) == A //post'
 	modifies a
 {
     // Introduce Local Variable *2
@@ -90,9 +93,10 @@ method TwoWayPartition1(a: array<int>, ghost A: multiset<int>)
     i, j := TwoWayPartition2(a, A);
 }
 
+
 method TwoWayPartition2(a: array<int>, ghost A: multiset<int>) returns(i: nat, j: nat)
-    requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..]) //pre
-	ensures Sorted(a[..]) && multiset(a[..]) == A //post
+    requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..]) //pre1
+	ensures Sorted(a[..]) && multiset(a[..]) == A //post1
 	modifies a
 {
     // sequential composition + strengthen postcondition
@@ -102,8 +106,8 @@ method TwoWayPartition2(a: array<int>, ghost A: multiset<int>) returns(i: nat, j
 }
 
 lemma LemmaStrengthenPostcondition(a: array<int>,A: multiset<int>, i:nat, j:nat)
-    requires Inv(a[..], A, i, j) && !Guard(a, A, i, j) //post'
-    ensures Sorted(a[..]) && multiset(a[..]) == A //post
+    requires Inv(a[..], A, i, j) && !Guard(a, A, i, j) //post1'
+    ensures Sorted(a[..]) && multiset(a[..]) == A //post1
 {}
 
 lemma LemmaInit(a: array<int>, A: multiset<int>)
@@ -112,7 +116,7 @@ lemma LemmaInit(a: array<int>, A: multiset<int>)
 {}
 
 method Init(a: array<int>, ghost A: multiset<int>) returns(i: nat, j: nat)
-    requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..]) //pre
+    requires ZeroesAndOnesOnly(a[..]) && A == multiset(a[..]) //pre1
     ensures Inv(a[..], A, i, j) //mid
 {
     // assignment
@@ -122,7 +126,7 @@ method Init(a: array<int>, ghost A: multiset<int>) returns(i: nat, j: nat)
 
 method Loop(a: array<int>, ghost A: multiset<int>, i0: nat, j0: nat) returns(i: nat, j: nat)
     requires Inv(a[..], A, i0, j0) //mid
-    ensures Inv(a[..], A, i, j) && !Guard(a, A, i, j) //post'
+    ensures Inv(a[..], A, i, j) && !Guard(a, A, i, j) //post1'
     modifies a
 {
     i, j := i0, j0;
@@ -159,7 +163,7 @@ method LoopAssignment1(a: array<int>, ghost A: multiset<int>, i0: nat, j0: nat) 
     modifies a
 {
     i, j := i0, j0;
-    // assignment
+    // assignment 
     LemmaLoopAssignment1(a, A ,i ,j);
     a[i], a[j], i, j := a[j], a[i], i+1, j+1;
 }
