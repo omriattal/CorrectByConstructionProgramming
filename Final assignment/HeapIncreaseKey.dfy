@@ -110,6 +110,8 @@ method LoopBody(a: array<int>, ghost A: seq<int> ,i: nat, key: int, j0: nat) ret
 		// assignment
 		Lemma3Assignments(a[..], A, i, key, j);
 		a[j], a[Parent(j)], j := a[Parent(j)], a[j], Parent(j);
+		// Q5: how does multi-variables assignment work? we found that the order of the assignments can make difference
+		//j, a[j], a[Parent(j)] := Parent(j), a[Parent(j)], a[j];
 	}
 
 lemma Lemma3Assignments(a: seq<int>, A: seq<int> ,i: nat, key: int, j: nat) 
@@ -146,7 +148,7 @@ lemma Lemma3Assignments(a: seq<int>, A: seq<int> ,i: nat, key: int, j: nat)
 				assert a_sub[r] >= a_sub[k];
 			}
 			else if r == j
-			{
+			{// 
 				assert hp_except_at(a, j);						//Before subtitution: a[Parent(j)] > a[k] s.t AncestorIndex(Parent(j), k)
 				assert AncestorIndex(Parent(j),r);				//Because AncestorIndex(Parent(j),j) && r == j
 				assert AncestorIndex(r, k);						//Because of the forall assumption
@@ -277,14 +279,34 @@ method HeapIncreaseKey_with_Recursion5(a: array<int>, ghost A: seq<int>, i: nat,
 	decreases j0, 9
 {
 	j := j0;
-	// sequential composition 
+	// sequential composition + weaken precondition + strengthen postcondition 
 	j := Assignments(a, A, i, key, j0);
+	LemmaPre(a, A, i, key, j0, j);
 	assert j == Parent(j0) < j0; // termination justification
-
-	//LemmaPre - maybe weaken preCondition
 	j := HeapIncreaseKey_with_Recursion4(a, A, i, key, j);
-	//LemmaPost
+	LemmaPost(a, A, i, key, j0, j);
 }
+lemma LemmaPre(a: array<int>, A: seq<int>, i: nat, key: int, j0: nat, j: nat)
+	requires Inv(a[..], A, i, key, j) //&& j == Parent(j0) // postcondition of Assignments == precondition of the rec call (mid of the seq comp)
+	ensures Inv(a[..], A, i, key, j) //[j\j0]
+{
+	// Q1: can we delete j == Parent(j0) to avoid errors? Do we have to justify it using another weaken precondition lemma?
+	// Q2: is the subtitution [j\j0] is right?
+}
+
+lemma LemmaPost(a: array<int>, A: seq<int>, i: nat, key: int, j0: nat, j: nat)
+	requires Inv(a[..], A, i, key, j0) // precondition of HeapIncreaseKey_with_Recursion4 with subtitution [j\j0]
+	requires hp(a[..]) && multiset(a[..]) == multiset(A[i := key]) // postcondition of HeapIncreaseKey_with_Recursion4
+	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])  // postcondition of HeapIncreaseKey_with_Recursion5
+{
+	// Q3: good enough?
+}
+
+// method HeapIncreaseKey_with_Recursion4(a: array<int>, ghost A: seq<int>, i: nat, key: int, j0: nat) returns(j: nat)
+// 	requires Inv(a[..], A, i, key, j0)//mid'
+// 	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])
+// 	modifies a
+// 	decreases j0, 10
 
 method Assignments(a: array<int>, ghost A: seq<int>, i: nat, key: int, j0: nat) returns(j: nat)
 	requires Inv(a[..], A, i, key, j0) && Guard(a[..], j0)
@@ -304,10 +326,11 @@ lemma LemmaAssignments(a: array<int>, A: seq<int>, i: nat, key: int, j: nat)
 {
 	// We have riched to the same problem as in the iterative function, but now we already have the solution - Lemma3Assignments
 	assert Inv(a[..][j := a[Parent(j)]][Parent(j) := a[j]], A, i, key, Parent(j)) by{
+		// Q4: can we use lemma this way? do we have to fustify it?
 		Lemma3Assignments(a[..], A, i, key, j);
 	}
 }
-
+ 
 /**********************************************************************************************************************/
 
 method {:verify false} Main() {
