@@ -25,13 +25,13 @@ method HeapIncreaseKey1(a: array<int>, ghost A: seq<int> ,i: nat, key: int)
 }
 
 lemma LemmaStrengthen1(a: array<int>, q: seq<int>, A: seq<int>,i: nat, key: int)
-	requires i < |q| && q[i] < key && hp(q) && A == q //pre[w\w0]
+	requires i < |q| && q[i] < key && hp(q) && A == q //pre[q\a]
 	requires hp(a[..]) && multiset(a[..]) == multiset(A[i := key]) //post'
 	ensures hp(a[..]) && multiset(a[..]) == multiset(q[i := key]) //post
 {}
 method HeapIncreaseKey2(a: array<int>, ghost A: seq<int> ,i: nat, key: int)
 	requires i < a.Length && a[i] < key && hp(a[..]) && A == a[..] //pre
-	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])//post'
+	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key]) //post'
 	modifies a
 {
 	// introduce local variable + stengthen postcondition
@@ -110,8 +110,6 @@ method LoopBody(a: array<int>, ghost A: seq<int> ,i: nat, key: int, j0: nat) ret
 		// assignment
 		Lemma3Assignments(a[..], A, i, key, j);
 		a[j], a[Parent(j)], j := a[Parent(j)], a[j], Parent(j);
-		// Q5: how does multi-variables assignment work? we found that the order of the assignments can make difference
-		//j, a[j], a[Parent(j)] := Parent(j), a[Parent(j)], a[j];
 	}
 
 lemma Lemma3Assignments(a: seq<int>, A: seq<int> ,i: nat, key: int, j: nat) 
@@ -202,7 +200,7 @@ method HeapIncreaseKey_with_Recursion1(a: array<int>, ghost A: seq<int>, i: nat,
 }
 
 lemma LemmaStrengthen4(a: array<int>, A: seq<int>, q: seq<int>, i: nat, key: int)	
-	requires i < |q| && q[i] < key && hp(q) && A == q //pre[w\w0]
+	requires i < |q| && q[i] < key && hp(q) && A == q //pre[q\a]
 	requires hp(a[..]) && multiset(a[..]) == multiset(A[i := key])//post'
 	ensures hp(a[..]) && multiset(a[..]) == multiset(q[i := key])//post
 {}
@@ -212,7 +210,7 @@ method HeapIncreaseKey_with_Recursion2(a: array<int>, ghost A: seq<int>, i: nat,
 	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])//post'
 	modifies a
 {
-	// Introduce Local Variable
+	// introduce local variable
 	var j;
 	j := HeapIncreaseKey_with_Recursion3(a, A, i, key);
 }
@@ -222,15 +220,14 @@ method HeapIncreaseKey_with_Recursion3(a: array<int>, ghost A: seq<int>, i: nat,
 	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])
 	modifies a
 {
-	// sequential composition + weaken precondition
+	// sequential composition
 	j := init(a, A, i, key);
-	LemmaWeaken(a, A, i, key, j);
 	j := HeapIncreaseKey_with_Recursion4(a, A, i, key, j);
 }
 
 method init(a: array<int>, ghost A: seq<int>, i: nat, key: int) returns(j: nat)
-	requires i < a.Length && a[i] < key && hp(a[..]) && A == a[..]//pre
-	ensures  j <= i < a.Length == |A| && hp_except_at(a[..],j) && multiset(a[..]) == multiset(A[i := key]) && hi(a[..],0,a.Length, j)//mid
+	requires i < a.Length && a[i] < key && hp(a[..]) && A == a[..]
+	ensures Inv(a[..], A, i, key, j) 
 	modifies a
 {
 	// assignment
@@ -240,17 +237,12 @@ method init(a: array<int>, ghost A: seq<int>, i: nat, key: int) returns(j: nat)
 
 lemma LemmaAssignment(a: array<int>, A: seq<int>, i: nat, key: int)
 	requires i < a.Length && a[i] < key && hp(a[..]) && A == a[..]
-	ensures i <= i < a.Length == |A| && hp_except_at(a[..][i := key],i) && multiset(a[..][i := key]) == multiset(A[i := key]) && hi(a[..][i := key],0,a.Length, i)
-{}
-
-lemma LemmaWeaken(a: array<int>, A: seq<int>, i: nat, key: int, j: nat)
-	requires j <= i < a.Length == |A| && hp_except_at(a[..],j) && multiset(a[..]) == multiset(A[i := key]) && hi(a[..],0,a.Length, j)//mid
-	ensures Inv(a[..], A, i, key, j)//mid'
+	ensures Inv(a[..][i := key], A, i, key,i)
 {}
 
 // This is the recursion part:
 method HeapIncreaseKey_with_Recursion4(a: array<int>, ghost A: seq<int>, i: nat, key: int, j0: nat) returns(j: nat)
-	requires Inv(a[..], A, i, key, j0)//mid'
+	requires Inv(a[..], A, i, key, j0)
 	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])
 	modifies a
 	decreases j0, 10
@@ -279,65 +271,75 @@ method HeapIncreaseKey_with_Recursion5(a: array<int>, ghost A: seq<int>, i: nat,
 	decreases j0, 9
 {
 	j := j0;
-	// sequential composition + weaken precondition + strengthen postcondition 
-	j := Assignments(a, A, i, key, j0);
-	LemmaPre(a, A, i, key, j0, j);
-	assert j == Parent(j0) < j0; // termination justification
-	j := HeapIncreaseKey_with_Recursion4(a, A, i, key, j);
-	LemmaPost(a, A, i, key, j0, j);
-}
-lemma LemmaPre(a: array<int>, A: seq<int>, i: nat, key: int, j0: nat, j: nat)
-	requires Inv(a[..], A, i, key, j) //&& j == Parent(j0) // postcondition of Assignments == precondition of the rec call (mid of the seq comp)
-	ensures Inv(a[..], A, i, key, j) //[j\j0]
-{
-	// Q1: can we delete j == Parent(j0) to avoid errors? Do we have to justify it using another weaken precondition lemma?
-	// Q2: is the subtitution [j\j0] is right?
+	// introduce logical constant
+	ghost var prevJ := j; // we back-up the value of j (before decreasing) for proving termination later on.
+	j := HeapIncreaseKey_with_Recursion6(a, A, i, key, j, prevJ);
 }
 
-lemma LemmaPost(a: array<int>, A: seq<int>, i: nat, key: int, j0: nat, j: nat)
-	requires Inv(a[..], A, i, key, j0) // precondition of HeapIncreaseKey_with_Recursion4 with subtitution [j\j0]
-	requires hp(a[..]) && multiset(a[..]) == multiset(A[i := key]) // postcondition of HeapIncreaseKey_with_Recursion4
-	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])  // postcondition of HeapIncreaseKey_with_Recursion5
-{
-	// Q3: good enough?
-}
-
-// method HeapIncreaseKey_with_Recursion4(a: array<int>, ghost A: seq<int>, i: nat, key: int, j0: nat) returns(j: nat)
-// 	requires Inv(a[..], A, i, key, j0)//mid'
-// 	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])
-// 	modifies a
-// 	decreases j0, 10
-
-method Assignments(a: array<int>, ghost A: seq<int>, i: nat, key: int, j0: nat) returns(j: nat)
-	requires Inv(a[..], A, i, key, j0) && Guard(a[..], j0)
-	ensures Inv(a[..], A, i, key, j) && j == Parent(j0)
+method HeapIncreaseKey_with_Recursion6(a: array<int>, ghost A: seq<int>, i: nat, key: int, j0: nat, ghost prevJ: int) returns(j: nat)
+	requires Inv(a[..], A, i, key, j0) && Guard(a[..], j0) && prevJ == j0
+	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])
 	modifies a
-	decreases j0
+	decreases j0, 8
+{
+	j := j0;
+	// sequential composition
+	j := Assignments(a, A, i, key, j, prevJ);
+	j := HeapIncreaseKey_with_Recursion7(a, A, i, key, j, prevJ);
+}
+
+method Assignments(a: array<int>, ghost A: seq<int>, i: nat, key: int, j0: nat, ghost prevJ: int) returns(j: nat)
+	requires Inv(a[..], A, i, key, j0) && Guard(a[..], j0) && prevJ == j0
+	ensures j > 0  && Inv(a[..], A, i, key, Parent(j)) && prevJ == j
+	modifies a
+	decreases j0, 7
 {
 	j := j0;
 	// assignment
-	LemmaAssignments(a, A, i, key, j);
-	a[j], a[Parent(j)], j := a[Parent(j)], a[j], Parent(j);
+	LemmaAssignments(a, A, i, key, j, prevJ);
+	a[j], a[Parent(j)] := a[Parent(j)], a[j];
 }
 
-lemma LemmaAssignments(a: array<int>, A: seq<int>, i: nat, key: int, j: nat) 
-	requires Inv(a[..], A, i, key, j) && Guard(a[..], j)
-	ensures Inv(a[..][j := a[Parent(j)]][Parent(j) := a[j]], A, i, key, Parent(j)) && Parent(j) == Parent(j)
+lemma LemmaAssignments(a: array<int>, A: seq<int>, i: nat, key: int, j: nat, prevJ: nat) 
+	requires Inv(a[..], A, i, key, j) && Guard(a[..], j) && prevJ == j
+	ensures j > 0 && Inv(a[..][j := a[Parent(j)]][Parent(j) := a[j]], A, i, key, Parent(j)) && prevJ == j
 {
-	// We have riched to the same problem as in the iterative function, but now we already have the solution - Lemma3Assignments
-	assert Inv(a[..][j := a[Parent(j)]][Parent(j) := a[j]], A, i, key, Parent(j)) by{
-		// Q4: can we use lemma this way? do we have to fustify it?
+	assert Inv(a[..][j := a[Parent(j)]][Parent(j) := a[j]], A, i, key, Parent(j)) by
+	{
 		Lemma3Assignments(a[..], A, i, key, j);
 	}
 }
+
+method HeapIncreaseKey_with_Recursion7(a: array<int>, ghost A: seq<int>, i: nat, key: int, j0: nat, ghost prevJ: nat) returns(j: nat)
+	requires j0 > 0  && Inv(a[..], A, i, key, Parent(j0)) && prevJ == j0
+	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])
+	modifies a
+	decreases j0, 6
+{
+	j := j0; 
+	// completing the recursive call: weaken precondition + strengthen postcondition + termination 
+	LemmaPre(a, A, i, key, j0, prevJ);
+	assert Parent(j) < j; // termination justification
+	j := HeapIncreaseKey_with_Recursion4(a, A, i, key, Parent(j));
+	LemmaPost(a, A, i, key, j, j0, prevJ);
+}
+
+lemma LemmaPre(a: array<int>, A: seq<int>, i: nat, key: int, j: nat, prevJ: nat)
+	requires j > 0  && Inv(a[..], A, i, key, Parent(j)) && prevJ == j
+	ensures Inv(a[..], A, i, key, Parent(j)) 
+{}
+lemma LemmaPost(a: array<int>, A: seq<int>, i: nat, key: int, j: nat, j0:nat, prevJ: nat)
+	requires j0 > 0  && Inv(a[..], A, i, key, Parent(j0)) && prevJ == j0
+	requires hp(a[..]) && multiset(a[..]) == multiset(A[i := key])
+	ensures hp(a[..]) && multiset(a[..]) == multiset(A[i := key])  
+{}
  
 /**********************************************************************************************************************/
-
 method {:verify false} Main() {
-	var a: array<int> := new int[5];
+	var a: array<int> := new int[3];
 	a[0], a[1], a[2] := 4, 8, 6;
 
-	 var q0: seq<int> := a[..];
+	var q0: seq<int> := a[..];
 	assert q0 == [4,8,6];
 	HeapSort(a);
 	assert multiset(a[..]) == multiset(q0);
@@ -355,7 +357,7 @@ method {:verify false} Main() {
 	print "\nthe sorted version of [3, 8, 5, -1, 10] is ";
 	print a[..];
 	assert Sorted(a);
-	assert a[..] == [-1, 3, 5, 8, 12];
+	//assert a[..] == [-1, 3, 5, 8, 12];
 
 	a[0], a[1], a[2], a[3], a[4] := 3, 8, 5, -1, 12;
 	ghost var A := multiset(a[..]);
@@ -369,15 +371,14 @@ method {:verify false} Main() {
 	assert hp(a[..]);
 	print "\nthe heap after increasing element 3 to 9 is ";
 	print a[..];
-	assert a[..] == [12, 9, 5, 8, 3];
+	//assert a[..] == [12, 9, 5, 8, 3];
 	assert multiset(a[..]) == multiset(q1[3 := 9]); // == multiset([12, 9, 5, 8, 3]);
-	
 	ghost var q2 := a[..];
 	HeapIncreaseKey_with_Recursion(a, 4, 11);
 	assert hp(a[..]);
 	print "\nthe heap after increasing element 4 to 11 is ";
 	print a[..];
-	assert a[..] == [12, 11, 5, 8, 9];
+	//assert a[..] == [12, 11, 5, 8, 9];
 	assert multiset(a[..]) == multiset(q2[4 := 11]); // == multiset([12, 11, 5, 8, 9]);
 
 	assert AncestorIndex(0,0);
@@ -397,5 +398,4 @@ method {:verify false} Main() {
 	assert !AncestorIndex(2,4);
 	assert AncestorIndex(2,5);
 	assert AncestorIndex(2,6);
-	
 }
