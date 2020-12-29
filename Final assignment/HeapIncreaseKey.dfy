@@ -335,11 +335,12 @@ lemma LemmaPost(a: array<int>, A: seq<int>, i: nat, key: int, j: nat, j0:nat, pr
 {}
  
 /**********************************************************************************************************************/
+
 method {:verify false} Main() {
-	var a: array<int> := new int[3];
+	var a: array<int> := new int[5];
 	a[0], a[1], a[2] := 4, 8, 6;
 
-	var q0: seq<int> := a[..];
+	 var q0: seq<int> := a[..];
 	assert q0 == [4,8,6];
 	HeapSort(a);
 	assert multiset(a[..]) == multiset(q0);
@@ -357,7 +358,7 @@ method {:verify false} Main() {
 	print "\nthe sorted version of [3, 8, 5, -1, 10] is ";
 	print a[..];
 	assert Sorted(a);
-	//assert a[..] == [-1, 3, 5, 8, 12];
+	assert a[..] == [-1, 3, 5, 8, 12];
 
 	a[0], a[1], a[2], a[3], a[4] := 3, 8, 5, -1, 12;
 	ghost var A := multiset(a[..]);
@@ -371,14 +372,15 @@ method {:verify false} Main() {
 	assert hp(a[..]);
 	print "\nthe heap after increasing element 3 to 9 is ";
 	print a[..];
-	//assert a[..] == [12, 9, 5, 8, 3];
+	assert a[..] == [12, 9, 5, 8, 3];
 	assert multiset(a[..]) == multiset(q1[3 := 9]); // == multiset([12, 9, 5, 8, 3]);
+	
 	ghost var q2 := a[..];
 	HeapIncreaseKey_with_Recursion(a, 4, 11);
 	assert hp(a[..]);
 	print "\nthe heap after increasing element 4 to 11 is ";
 	print a[..];
-	//assert a[..] == [12, 11, 5, 8, 9];
+	assert a[..] == [12, 11, 5, 8, 9];
 	assert multiset(a[..]) == multiset(q2[4 := 11]); // == multiset([12, 11, 5, 8, 9]);
 
 	assert AncestorIndex(0,0);
@@ -398,4 +400,5 @@ method {:verify false} Main() {
 	assert !AncestorIndex(2,4);
 	assert AncestorIndex(2,5);
 	assert AncestorIndex(2,6);
+	
 }
