@@ -11,7 +11,7 @@ studies:
 6. Recursive procedures: rigorous derivation of sorting and search algorithms.
 7. Recursive types: linked lists and binary trees.
 
-_This repository includes the assignment of the course written in Dafny (Microsoft research language)._
+_This repository includes the assignment of the course written in Dafny or SPARK.
 
 ## The Assignments
 Assignment 1:
