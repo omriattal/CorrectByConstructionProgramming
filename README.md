@@ -1,4 +1,4 @@
-# CorrectByConstructionProgramming
+# Correct By Construction Programming
 **This is an advanced course teaching how to design algorithms and programs that are guaranteed to meet their specification.** Starting with a mathematical description of the program's requirements, the course presents a formal method for turning such specifications into actual code, in a stepwise approach known as refinement. Techniques of algorithm refinement are presented, for the derivation of loops and recursive procedures from invariants. The developed algorithms are typically very short, but challenging, as we aim to construct correct and efficient code. The taught material is mainly based on the textbook "Programming from Specifications" by Carroll Morgan.
 
 The following topics will be covered, along with a range of examples and case
