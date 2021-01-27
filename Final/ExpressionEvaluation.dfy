@@ -13,11 +13,11 @@ method Main() {
 	// print "\nThe iteratively-computed value of Add(Value(7),Multiply(Value(3),Value(5))) is ";
 	// print x;
 	
-	//TODO: delete exp2
-	var postfix;// := ComputePostfix(exp);
-	// print "\nThe postfix form of Add(Value(7),Multiply(Value(3),Value(5))) is ";
-	// print postfix;
-	// assert postfix == [Operand(7),Operand(3),Operand(5),Multiplication,Addition];
+	var postfix := ComputePostfix(exp);
+	print "\nThe postfix form of Add(Value(7),Multiply(Value(3),Value(5))) is ";
+	print postfix;
+	assert postfix == [Operand(7),Operand(3),Operand(5),Multiplication,Addition];
+
 	postfix := ComputePostfixIter(exp); // compute the postfix sequence iteratively this time, instead of recursively
 	print "\nThe iteratively-computed postfix form of Add(Value(7),Multiply(Value(3),Value(5))) is ";
 	print postfix;
@@ -44,12 +44,59 @@ method Evaluate(exp: Expression) returns (val: int)
 		case Multiply(l,r) => var valLeft := Evaluate(l); var valRight := Evaluate(r); val := valLeft*valRight;
 	}
 }
-
+/**
+    // Method to evaluate value of a postfix expression 
+    static int evaluatePostfix(String exp) 
+    { 
+        //create a stack 
+        Stack<Integer> stack=new Stack<>(); 
+          
+        // Scan all characters one by one 
+        for(int i=0;i<exp.length();i++) 
+        { 
+            char c=exp.charAt(i); 
+              
+            // If the scanned character is an operand (number here), 
+            // push it to the stack. 
+            if(Character.isDigit(c)) 
+            stack.push(c - '0'); 
+			 
+            //  If the scanned character is an operator, pop two 
+            // elements from stack apply the operator 
+            else
+            { 
+                int val1 = stack.pop(); 
+                int val2 = stack.pop();          
+                switch(c) 
+                { 
+                    case '+': 
+                    stack.push(val2+val1); 
+                    break; 
+                    
+                    case '*': 
+                    stack.push(val2*val1); 
+                    break; 
+              } 
+            } 
+        } 
+        return stack.pop();     
+    } 
+	EXAMPLE: 231*+9-
+ */
 // TODO: implement iteratively (not recursively), using a loop;
 // if it helps, feel free to use ComputePostfix or ComputePostfixIter;
 // NO NEED to document the steps of refinement
-// method EvaluateIter(exp: Expression) returns (val: int)
+// method {:verify false} EvaluateIter(exp: Expression) returns (val: int)
 // 	ensures val == ValueOf(exp)
+// {
+// 	var ops, i,val := ComputePostfixIter(exp), 0,0;
+// 	while(i != |ops|)
+// 		invariant 
+// 		decreases |ops| - i
+// 	{
+
+// 	}
+// }
 
 function Postfix(exp: Expression): seq<Op>
 	decreases exp
@@ -62,9 +109,214 @@ function Postfix(exp: Expression): seq<Op>
 }
 
 // TODO: implement and document ALL steps of refinement (REC)
-// method ComputePostfix(exp: Expression) returns (res: seq<Op>)
-// 	ensures res == Postfix(exp)
-// 	decreases exp
+method ComputePostfix(exp: Expression) returns (res: seq<Op>)
+	ensures res == Postfix(exp)
+	decreases exp,10
+{
+	// alternation
+	match exp {
+		case Value(x) => res := ComputePostfix1A(exp,x); //[Operand(x)]
+		case Add(l,r) => res := ComputePostfix1B(exp,l,r); //Postfix(l)+Postfix(r)+[Addition]
+		case Multiply(l,r) => res := ComputePostfix1C(exp,l,r); //Postfix(l)+Postfix(r)+[Multiplication]
+	}
+}
+
+method ComputePostfix1A(exp: Expression, x: int) returns (res: seq<Op>)
+	requires exp == Value(x)
+	ensures res == Postfix(exp)
+{
+	// assignment
+	LemmaAssignment1(exp,x);
+	res := [Operand(x)];
+}
+
+lemma LemmaAssignment1(exp: Expression, x: int)
+	requires exp == Value(x)
+	ensures [Operand(x)] == Postfix(exp)
+{}
+
+method ComputePostfix1B(exp: Expression, l:Expression, r:Expression) returns (res: seq<Op>)
+	requires exp == Add(l,r)
+	ensures res == Postfix(exp)
+	decreases exp,9
+{
+	// leading assignment
+	res := [Addition];
+	res := ComputePostfix2(exp, l, r, res);
+}
+
+method ComputePostfix2(exp: Expression, l:Expression, r:Expression, res0: seq<Op>) returns (res: seq<Op>)
+	requires exp == Add(l,r) && res0 == [Addition]
+	ensures res == Postfix(exp)
+	decreases exp,8
+{
+	res := res0;
+	// sequential composition
+	res := ComputePostfix3A(exp,l,r,res);
+	res := ComputePostfix3B(exp,l,r,res);
+}
+
+method ComputePostfix3A(exp: Expression, l:Expression, r:Expression, res0: seq<Op>) returns (res: seq<Op>)
+	requires exp == Add(l,r) && res0 == [Addition]
+	ensures res == Postfix(r) + [Addition] && exp == Add(l,r)
+	decreases exp,7
+{
+	res := res0;
+	// introduce local variable + following assignment + contract frame
+	var postFixR := ComputePostfix4(exp, l, r, res);
+	res := postFixR + res;
+}
+
+method ComputePostfix4 (exp: Expression, l:Expression, r:Expression, res: seq<Op>) returns (postFixR: seq<Op>)
+	requires exp == Add(l,r) && res == [Addition]
+	ensures postFixR + res == Postfix(r) + [Addition] && exp == Add(l,r)
+	decreases exp,6
+{
+	// reuse (recursive call): strengthen postcondition + weaken precondition + termination
+	Lemma4Pre(exp,l,r,res);
+	assert r < exp; //termination justification
+	postFixR := ComputePostfix(r);
+	Lemma4Post(exp,l,r,res,postFixR);
+	
+}
+lemma Lemma4Pre(exp: Expression, l:Expression, r:Expression,res:seq<Op>)
+	requires exp == Add(l,r) && res == [Addition]
+	ensures true
+{}
+
+lemma Lemma4Post(exp: Expression, l:Expression, r:Expression,res:seq<Op>,postFixR:seq<Op>)
+	requires exp == Add(l,r) && res == [Addition] 
+	requires postFixR == Postfix(r)
+	ensures postFixR + res == Postfix(r) + [Addition] && exp == Add(l,r)
+{}
+
+method ComputePostfix3B(exp: Expression, l:Expression, r:Expression, res0: seq<Op>) returns (res: seq<Op>)
+	requires res0 == Postfix(r) + [Addition] && exp == Add(l,r)
+	ensures res == Postfix(exp)
+	decreases exp,7
+{
+	res := res0;
+	// introduce local variable + following assignment + contract frame
+	var postFixL := ComputePostfix5(exp,l,r,res);
+	res := postFixL + res;
+}
+
+method ComputePostfix5(exp: Expression, l:Expression, r:Expression, res: seq<Op>) returns (postFixL: seq<Op>)
+	requires res == Postfix(r) + [Addition] && exp == Add(l,r)
+	ensures postFixL + res == Postfix(exp)
+	decreases exp,6
+{
+	// reuse (recursive call): strengthen postcondition + weaken precondition + termination
+	Lemma5Pre(exp,l,r,res);
+	assert l < exp; //termination justification
+	postFixL := ComputePostfix(l);
+	Lemma5Post(exp,l,r,res,postFixL);
+}
+
+lemma Lemma5Pre(exp: Expression, l:Expression, r:Expression, res: seq<Op>)
+	requires res == Postfix(r) + [Addition] && exp == Add(l,r)
+	ensures true
+{}
+
+lemma Lemma5Post(exp: Expression, l:Expression, r:Expression,res:seq<Op>,postFixL:seq<Op>)
+	requires res == Postfix(r) + [Addition] && exp == Add(l,r)
+	requires postFixL == Postfix(l)
+	ensures postFixL + res == Postfix(exp)
+{}
+/****************************************************************************************************************************************************/
+method ComputePostfix1C(exp: Expression, l:Expression, r:Expression) returns (res: seq<Op>)
+	requires exp == Multiply(l,r)
+	ensures res == Postfix(exp)
+	decreases exp,9
+{
+	// leading assignment
+	res := [Multiplication];
+	res := ComputePostfix6(exp, l, r, res);
+}
+
+method ComputePostfix6(exp: Expression, l:Expression, r:Expression, res0: seq<Op>) returns (res: seq<Op>)
+	requires exp == Multiply(l,r) && res0 == [Multiplication]
+	ensures res == Postfix(exp)
+	decreases exp,8
+{
+	res := res0;
+	// sequential composition
+	res := ComputePostfix7A(exp,l,r,res);
+	res := ComputePostfix7B(exp,l,r,res);
+}
+
+method ComputePostfix7A(exp: Expression, l:Expression, r:Expression, res0: seq<Op>) returns (res: seq<Op>)
+	requires exp == Multiply(l,r) && res0 == [Multiplication]
+	ensures res == Postfix(r) + [Multiplication] && exp == Multiply(l,r)
+	decreases exp,7
+{
+	res := res0;
+	// introduce local variable + following assignment + contract frame
+	var postFixR := ComputePostfix8(exp, l, r, res);
+	res := postFixR + res;
+}
+
+method ComputePostfix8(exp: Expression, l:Expression, r:Expression, res: seq<Op>) returns (postFixR: seq<Op>)
+	requires exp == Multiply(l,r) && res == [Multiplication]
+	ensures postFixR + res == Postfix(r) + [Multiplication] && exp == Multiply(l,r)
+	decreases exp,6
+{
+	// reuse (recursive call): strengthen postcondition + weaken precondition + termination
+	Lemma8Pre(exp,l,r,res);
+	assert r < exp; //termination justification
+	postFixR := ComputePostfix(r);
+	Lemma8Post(exp,l,r,res,postFixR);
+	
+}
+lemma Lemma8Pre(exp: Expression, l:Expression, r:Expression,res:seq<Op>)
+	requires exp == Multiply(l,r) && res == [Multiplication]
+	ensures true
+{}
+
+lemma Lemma8Post(exp: Expression, l:Expression, r:Expression,res:seq<Op>,postFixR:seq<Op>)
+	requires exp == Multiply(l,r) && res == [Multiplication] 
+	requires postFixR == Postfix(r)
+	ensures postFixR + res == Postfix(r) + [Multiplication] && exp == Multiply(l,r)
+{}
+
+method ComputePostfix7B(exp: Expression, l:Expression, r:Expression, res0: seq<Op>) returns (res: seq<Op>)
+	requires res0 == Postfix(r) + [Multiplication] && exp == Multiply(l,r)
+	ensures res == Postfix(exp)
+	decreases exp,7
+{
+	res := res0;
+	// introduce local variable + following assignment + contract frame
+	var postFixL := ComputePostfix9(exp,l,r,res);
+	res := postFixL + res;
+}
+
+method ComputePostfix9(exp: Expression, l:Expression, r:Expression, res: seq<Op>) returns (postFixL: seq<Op>)
+	requires res == Postfix(r) + [Multiplication] && exp == Multiply(l,r)
+	ensures postFixL + res == Postfix(exp)
+	decreases exp,6
+{
+	// reuse (recursive call): strengthen postcondition + weaken precondition + termination
+	Lemma9Pre(exp,l,r,res);
+	assert l < exp; //termination justification
+	postFixL := ComputePostfix(l);
+	Lemma9Post(exp,l,r,res,postFixL);
+}
+
+lemma Lemma9Pre(exp: Expression, l:Expression, r:Expression, res: seq<Op>)
+	requires res == Postfix(r) + [Multiplication] && exp == Multiply(l,r)
+	ensures true
+{}
+
+lemma Lemma9Post(exp: Expression, l:Expression, r:Expression,res:seq<Op>,postFixL:seq<Op>)
+	requires res == Postfix(r) + [Multiplication] && exp == Multiply(l,r)
+	requires postFixL == Postfix(l)
+	ensures postFixL + res == Postfix(exp)
+{}
+
+/****************************************************************************************************************************************************/
+/*************************************************************   ComputePostFixIter    **************************************************************/
+/****************************************************************************************************************************************************/
+
 
 // TODO: complete the implementation (of LoopBody below) and the verification
 // (by providing a body to Inv, V, LemmaInit, and LemmaPost below);
