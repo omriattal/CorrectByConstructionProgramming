@@ -83,6 +83,27 @@ method Evaluate(exp: Expression) returns (val: int)
     } 
 	EXAMPLE: 231*+9-
  */
+
+ function ValueOfOpsSeq(ops: seq<Op>,exp:Expression): int
+	requires ops == Postfix(exp)
+	decreases ops
+{
+	if ops == [] then 0 else
+	if |ops| == 1 then 
+		match ops[0] {
+		case Operand(x) => x
+		case Addition => 0
+		case Multiplication => 0
+	}
+	else 
+	match ops[|ops|-1] {
+		case Operand(x) => x
+		// Addition => valueOfOpsSeq(ops[..|ops|-1]) + valueOfOpsSeq(ops[..|ops|-2])
+		case Addition => ValueOfOpsSeq(ops[..|ops|-3] + [Operand(ValueOfOpsSeq([ops[|ops|-2]]) + ValueOfOpsSeq([ops[|ops|-3]]))])
+		case Multiplication => ValueOfOpsSeq(ops[..|ops|-3] + [Operand(ValueOfOpsSeq([ops[|ops|-2]]) * ValueOfOpsSeq([ops[|ops|-3]]))])
+	}
+}
+
 // TODO: implement iteratively (not recursively), using a loop;
 // if it helps, feel free to use ComputePostfix or ComputePostfixIter;
 // NO NEED to document the steps of refinement
@@ -98,6 +119,10 @@ method Evaluate(exp: Expression) returns (val: int)
 // 	}
 // }
 
+/****************************************************************************************************************************************************/
+/*************************************************************   ComputePostFix    **************************************************************/
+/****************************************************************************************************************************************************/
+
 function Postfix(exp: Expression): seq<Op>
 	decreases exp
 {
@@ -107,7 +132,6 @@ function Postfix(exp: Expression): seq<Op>
 		case Multiply(l,r) => Postfix(l)+Postfix(r)+[Multiplication]
 	}
 }
-
 // TODO: implement and document ALL steps of refinement (REC)
 method ComputePostfix(exp: Expression) returns (res: seq<Op>)
 	ensures res == Postfix(exp)
