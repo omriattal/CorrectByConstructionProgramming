@@ -20,3 +20,5 @@ Assignment 1:
 
 Assignment 2 (Final Assignment):
 1. [Heap Increase Key](https://moodle2.bgu.ac.il/moodle/pluginfile.php/2627643/mod_resource/content/1/HeapIncreaseKey.dfy)
+2. [Expression Evaluation](https://moodle2.bgu.ac.il/moodle/pluginfile.php/2663737/mod_resource/content/1/ExpressionEvaluation.dfy)
+3. [Pair Insertion Sort](https://moodle2.bgu.ac.il/moodle/pluginfile.php/2663736/mod_resource/content/1/PairInsertionSort.dfy)
