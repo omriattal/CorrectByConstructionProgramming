@@ -8,10 +8,10 @@ method Main() {
 	print x;
 	assert x == 7 + 3*5;
 
-	// x := EvaluateIter(exp); // evaluate iteratively this time, instead of recursively
-	// assert x == 7 + 3*5;
-	// print "\nThe iteratively-computed value of Add(Value(7),Multiply(Value(3),Value(5))) is ";
-	// print x;
+	x := EvaluateIter(exp); // evaluate iteratively this time, instead of recursively
+	assert x == 7 + 3*5;
+	print "\nThe iteratively-computed value of Add(Value(7),Multiply(Value(3),Value(5))) is ";
+	print x;
 	
 	var postfix := ComputePostfix(exp);
 	print "\nThe postfix form of Add(Value(7),Multiply(Value(3),Value(5))) is ";
@@ -44,80 +44,39 @@ method Evaluate(exp: Expression) returns (val: int)
 		case Multiply(l,r) => var valLeft := Evaluate(l); var valRight := Evaluate(r); val := valLeft*valRight;
 	}
 }
-/**
-    // Method to evaluate value of a postfix expression 
-    static int evaluatePostfix(String exp) 
-    { 
-        //create a stack 
-        Stack<Integer> stack=new Stack<>(); 
-          
-        // Scan all characters one by one 
-        for(int i=0;i<exp.length();i++) 
-        { 
-            char c=exp.charAt(i); 
-              
-            // If the scanned character is an operand (number here), 
-            // push it to the stack. 
-            if(Character.isDigit(c)) 
-            stack.push(c - '0'); 
-			 
-            //  If the scanned character is an operator, pop two 
-            // elements from stack apply the operator 
-            else
-            { 
-                int val1 = stack.pop(); 
-                int val2 = stack.pop();          
-                switch(c) 
-                { 
-                    case '+': 
-                    stack.push(val2+val1); 
-                    break; 
-                    
-                    case '*': 
-                    stack.push(val2*val1); 
-                    break; 
-              } 
-            } 
-        } 
-        return stack.pop();     
-    } 
-	EXAMPLE: 231*+9-
- */
 
- function ValueOfOpsSeq(ops: seq<Op>,exp:Expression): int
-	requires ops == Postfix(exp)
-	decreases ops
-{
-	if ops == [] then 0 else
-	if |ops| == 1 then 
-		match ops[0] {
-		case Operand(x) => x
-		case Addition => 0
-		case Multiplication => 0
-	}
-	else 
-	match ops[|ops|-1] {
-		case Operand(x) => x
-		// Addition => valueOfOpsSeq(ops[..|ops|-1]) + valueOfOpsSeq(ops[..|ops|-2])
-		case Addition => ValueOfOpsSeq(ops[..|ops|-3] + [Operand(ValueOfOpsSeq([ops[|ops|-2]]) + ValueOfOpsSeq([ops[|ops|-3]]))])
-		case Multiplication => ValueOfOpsSeq(ops[..|ops|-3] + [Operand(ValueOfOpsSeq([ops[|ops|-2]]) * ValueOfOpsSeq([ops[|ops|-3]]))])
-	}
-}
+// function ValueOfOps(ops: seq<Op>, exp: Expression): int
+// 	requires ops == Postfix(exp)
+// {}
 
 // TODO: implement iteratively (not recursively), using a loop;
 // if it helps, feel free to use ComputePostfix or ComputePostfixIter;
 // NO NEED to document the steps of refinement
-// method {:verify false} EvaluateIter(exp: Expression) returns (val: int)
-// 	ensures val == ValueOf(exp)
-// {
-// 	var ops, i,val := ComputePostfixIter(exp), 0,0;
-// 	while(i != |ops|)
-// 		invariant 
-// 		decreases |ops| - i
-// 	{
+method {:verify true} EvaluateIter(exp: Expression) returns (val: int)
+	ensures val == ValueOf(exp)
+{
+	var stack: seq<int>, i: nat := [], 0;
+	var ops := ComputePostfixIter(exp);
+	while i < |ops|
+		//invariant ValueOf(stack + ops[i..]) == ValueOf(exp)
+		//invariant 
+		decreases |ops| - i
+	{
+		match ops[i]{
+			case Operand(x) => stack := [x] + stack;
+			case Addition => Lemma2Elements(stack); stack := [stack[0] + stack[1]] + stack[2..];
+			case Multiplication => Lemma2Elements(stack); stack := [stack[0] * stack[1]] + stack[2..];
+		}
+		i := i + 1;
+	}
+	Lemma1Element(stack);
+	val := stack[0];
+}
 
-// 	}
-// }
+lemma {:verify false} Lemma1Element(stack: seq<int>)
+	ensures |stack| >= 1
+lemma {:verify false} Lemma2Elements(stack: seq<int>)
+	ensures |stack| >= 2
 
 /****************************************************************************************************************************************************/
 /*************************************************************   ComputePostFix    **************************************************************/
