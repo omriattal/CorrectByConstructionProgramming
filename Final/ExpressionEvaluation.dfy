@@ -52,31 +52,114 @@ method Evaluate(exp: Expression) returns (val: int)
 // TODO: implement iteratively (not recursively), using a loop;
 // if it helps, feel free to use ComputePostfix or ComputePostfixIter;
 // NO NEED to document the steps of refinement
+// method {:verify true} EvaluateIter(exp: Expression) returns (val: int)
+// 	ensures val == ValueOf(exp)
+// {
+// 	var stack: seq<int>, i: nat := [], 0;
+// 	var expPostFix := ComputePostfixIter(exp);
+// 	while i < |expPostFix|
+// 		invariant Inv5(exp, stack, expPostFix, i)
+// 		decreases |expPostFix| - i
+// 	{
+// 		match expPostFix[i]{
+// 			case Operand(x)     => stack := stack + [x];
+// 			case Addition       => Lemma2Elements(stack); stack := stack[..|stack|-2] + [ stack[|stack|-1] + stack[|stack|-2] ];
+// 			case Multiplication => Lemma2Elements(stack); stack := stack[..|stack|-2] + [ stack[|stack|-1] * stack[|stack|-2] ];
+// 		}
+// 		i := i + 1;
+// 	}
+// 	Lemma1Element(stack);
+// 	val := stack[0];
+// }
+
+// predicate Inv5(exp: Expression, stack: seq<int>, expPostFix: seq<Op>, i:nat)
+// {
+// 	0 <= i <= |expPostFix| &&
+// 	exists exp':Expression :: ValueOf(exp')==ValueOf(exp) && Postfix(exp') == IntToOperands(stack) + expPostFix[i..]   
+// }
+
+// function IntToOperands(stack:seq<int>) : seq<Op>
+// {
+// 	if |stack| == 0 then []
+// 	else [Operand(stack[0])] + IntToOperands(stack[1..])
+// }
+
+// lemma {:verify false} Lemma1Element(stack: seq<int>)
+// 	ensures |stack| >= 1
+// lemma {:verify false} Lemma2Elements(stack: seq<int>)
+// 	ensures |stack| >= 2
+
 method {:verify true} EvaluateIter(exp: Expression) returns (val: int)
 	ensures val == ValueOf(exp)
 {
-	var stack: seq<int>, i: nat := [], 0;
-	var ops := ComputePostfixIter(exp);
-	while i < |ops|
-		//invariant ValueOf(stack + ops[i..]) == ValueOf(exp)
-		//invariant 
-		decreases |ops| - i
+	var stack: seq<Op>, i: nat, addOps: int, mulOps: int := [], 0, 0, 0;
+	var expPostFix := ComputePostfixIter(exp);
+	while i < |expPostFix|
+		invariant Inv5(exp, stack, expPostFix, i)
+		decreases |expPostFix| - i
 	{
-		match ops[i]{
-			case Operand(x) => stack := [x] + stack;
-			case Addition => Lemma2Elements(stack); stack := [stack[0] + stack[1]] + stack[2..];
-			case Multiplication => Lemma2Elements(stack); stack := [stack[0] * stack[1]] + stack[2..];
+		match expPostFix[i]{
+			case Operand(x)     => stack := stack + [Operand(x)];
+			case Addition       => Lemma2Elements(stack); addOps := addOperands(stack[|stack|-1] , stack[|stack|-2]); stack := stack[..|stack|-2] + [Operand(addOps)];
+			case Multiplication => Lemma2Elements(stack); mulOps := multiplyOperands(stack[|stack|-1] , stack[|stack|-2]); stack := stack[..|stack|-2] + [Operand(mulOps)];
 		}
 		i := i + 1;
+		LemmaInv(exp, stack, expPostFix, i);
 	}
 	Lemma1Element(stack);
-	val := stack[0];
+	val := getValue(stack[0]);
+	LemmaStrength(exp, stack, expPostFix, i, val);
 }
 
-lemma {:verify false} Lemma1Element(stack: seq<int>)
-	ensures |stack| >= 1
-lemma {:verify false} Lemma2Elements(stack: seq<int>)
+lemma {:verify false} LemmaStrength(exp: Expression, stack: seq<Op>, expPostFix: seq<Op>, i:nat, val: int)
+	requires Inv5(exp, stack, expPostFix, i) && i == |expPostFix|
+	ensures val == ValueOf(exp)
+{}
+
+lemma {:verify false} LemmaInv(exp: Expression, stack: seq<Op>, expPostFix: seq<Op>, i:nat)
+	ensures Inv5(exp, stack, expPostFix, i)
+{}
+
+predicate Inv5(exp: Expression, stack: seq<Op>, expPostFix: seq<Op>, i:nat)
+{
+	0 <= i <= |expPostFix| &&
+	(forall k:nat :: 0 <= k < |stack| ==> stack[k] != Addition && stack[k] != Multiplication) &&
+	exists exp':Expression :: ValueOf(exp')==ValueOf(exp) && Postfix(exp') == stack + expPostFix[i..]   
+}
+
+method addOperands(arg1: Op, arg2: Op) returns (result: int)
+	requires arg1 != Addition && arg1 != Multiplication
+	requires arg2 != Addition && arg2 != Multiplication
+{
+	var res1 := getValue(arg1);
+	var res2 := getValue(arg2);
+	result := res1 + res2;
+}
+
+method multiplyOperands(arg1: Op, arg2: Op) returns (result: int)
+	requires arg1 != Addition && arg1 != Multiplication
+	requires arg2 != Addition && arg2 != Multiplication
+{
+	var res1 := getValue(arg1);
+	var res2 := getValue(arg2);
+	result := res1 * res2;
+}
+
+method getValue(arg: Op) returns (value: int)
+	requires arg != Addition && arg != Multiplication
+{
+	match arg{
+		case Operand(x) => value := x;
+	}
+}
+
+lemma {:verify false} Lemma1Element(stack: seq<Op>)
+	ensures |stack| == 1
+{}
+
+lemma {:verify false} Lemma2Elements(stack: seq<Op>)
 	ensures |stack| >= 2
+{}
 
 /****************************************************************************************************************************************************/
 /*************************************************************   ComputePostFix    **************************************************************/
