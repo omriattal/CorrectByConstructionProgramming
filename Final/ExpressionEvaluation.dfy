@@ -98,33 +98,37 @@ method {:verify true} EvaluateIter(exp: Expression) returns (val: int)
 		invariant Inv5(exp, stack, expPostFix, i)
 		decreases |expPostFix| - i
 	{
+		var stack0 := stack;
 		match expPostFix[i]{
 			case Operand(x)     => stack := stack + [Operand(x)];
 			case Addition       => Lemma2Elements(stack); addOps := addOperands(stack[|stack|-1] , stack[|stack|-2]); stack := stack[..|stack|-2] + [Operand(addOps)];
 			case Multiplication => Lemma2Elements(stack); mulOps := multiplyOperands(stack[|stack|-1] , stack[|stack|-2]); stack := stack[..|stack|-2] + [Operand(mulOps)];
 		}
 		i := i + 1;
-		LemmaInv(exp, stack, expPostFix, i);
+		LemmaInv(exp, stack0, stack, expPostFix, i);
 	}
 	Lemma1Element(stack);
 	val := getValue(stack[0]);
 	LemmaStrength(exp, stack, expPostFix, i, val);
 }
 
+lemma {:verify false} LemmaInv(exp: Expression, stack0: seq<Op>, stack: seq<Op>, expPostFix: seq<Op>, i:nat)
+	//requires Inv5(exp, stack0, expPostFix, i-1) && i-1 < |expPostFix|
+	ensures Inv5(exp, stack, expPostFix, i)
+	decreases |expPostFix| - i 
+{}
+
 lemma {:verify false} LemmaStrength(exp: Expression, stack: seq<Op>, expPostFix: seq<Op>, i:nat, val: int)
 	requires Inv5(exp, stack, expPostFix, i) && i == |expPostFix|
 	ensures val == ValueOf(exp)
 {}
 
-lemma {:verify false} LemmaInv(exp: Expression, stack: seq<Op>, expPostFix: seq<Op>, i:nat)
-	ensures Inv5(exp, stack, expPostFix, i)
-{}
-
 predicate Inv5(exp: Expression, stack: seq<Op>, expPostFix: seq<Op>, i:nat)
 {
 	0 <= i <= |expPostFix| &&
-	(forall k:nat :: 0 <= k < |stack| ==> stack[k] != Addition && stack[k] != Multiplication) &&
-	exists exp':Expression :: ValueOf(exp')==ValueOf(exp) && Postfix(exp') == stack + expPostFix[i..]   
+	(forall k:nat :: 0 <= k < |stack| ==> stack[k] != Addition && stack[k] != Multiplication) && //stack contains only Operands 
+	exists exp':Expression :: ValueOf(exp')==ValueOf(exp) && Postfix(exp') == stack + expPostFix[i..]  
+	//value(stack + expPostFix[i..]) == value(satck0 + expPostFix[i-1..])
 }
 
 method addOperands(arg1: Op, arg2: Op) returns (result: int)
@@ -160,6 +164,40 @@ lemma {:verify false} Lemma1Element(stack: seq<Op>)
 lemma {:verify false} Lemma2Elements(stack: seq<Op>)
 	ensures |stack| >= 2
 {}
+
+function valueOfPostFix(postFix: seq<Op>, l: nat, r:nat) : int
+	requires 0 <= l <= r < |postFix| 
+	decreases r - l
+{
+	match postFix[r]{
+		case Operand(x) => x
+		case Addition => var k := getSeparator(postFix,r-1,0,0); valueOfPostFix(postFix,l,k-1) + valueOfPostFix(postFix,k,r)
+		case Multiplication => var k := getSeparator(postFix,r-1,0,0); valueOfPostFix(postFix,l,k-1) * valueOfPostFix(postFix,k,r)
+	}
+}
+
+function getSeparator(postFix: seq<Op>, i:nat, Operands: nat, Operators: nat): nat
+	requires 0 <= i < |postFix| 
+	decreases i
+{
+	if i==0 then 0 
+	else match postFix[i]{
+		case Operand(x) => if Operands == Operators then i else getSeparator(postFix, i-1, Operands+1, Operators)  
+		case Addition => getSeparator(postFix, i-1, Operands, Operators+1)
+		case Multiplication => getSeparator(postFix, i-1, Operands, Operators+1)
+	}
+}
+
+/*
+שאלות לשעות קבלה
+ניסינו לממש את האלגוריתם המוכר עם המחסנית
+האינווריאנטה שלנו היא שמירה של הערך שיש בשרשור
+stack + expPostFix[i..]
+ואנחנו לא מצליחים להגדיר פונקציה שמקבלת 
+seq<Op>
+ומחזירה את הערך שהוא מייצג
+ישבנו על זה ימים שלמים וניסינו 2 אלגוריתמים שונים וכמה אינווריאנטות שונות..
+*/
 
 /****************************************************************************************************************************************************/
 /*************************************************************   ComputePostFix    **************************************************************/
