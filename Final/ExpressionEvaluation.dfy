@@ -90,6 +90,8 @@ lemma {:verify false} LemmaOperandLeft(PF: seq<Op>)
 	ensures isOperand(PF[0])
 {}
 
+
+
 lemma {:verify false} LemmaInv30(exp: Expression, PF0: seq<Op>, PF: seq<Op>, i: nat, res: int)
 	requires 1 < |PF0| && Inv30(exp, PF0) && 2 <= i < |PF0|
 	requires isOperand(PF0[i-2]) && isOperand(PF0[i-1]) && isOperator(PF0[i])
@@ -103,7 +105,10 @@ lemma {:verify false} LemmaI(PF: seq<Op>, i: nat)
 	requires exists e:Expression :: Postfix(e) == PF
 	ensures isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i])
 {}
-
+/**
+TODO: ensures that there is an i< |PF| which: operand,operand,operator
+	  ensures that there must be an operand,or maybe operand number > operator number.
+ */
 predicate Inv30(exp: Expression, PF: seq<Op>)
 {
 	|PF| > 0 && (exists e:Expression :: Postfix(e) == PF && ValueOf(e) == ValueOf(exp))
@@ -129,7 +134,7 @@ method EvaluateIter(exp: Expression) returns (val: int)
 	ensures val == ValueOf(exp)
 {
 	var PF: seq<Op> := ComputePostfix(exp);
-	var stack: seq<Op>, i: nat, res: int := [], 0, 0;
+	var stack: seq<Op>, i: nat := [], 0;
 
 	while i != |PF|
 		invariant Inv31(exp, PF, stack, i)
