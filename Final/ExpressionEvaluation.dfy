@@ -7,12 +7,11 @@ method Main() {
 	var x := Evaluate(exp);
 	print x;
 	assert x == 7 + 3*5;
-
 	x := EvaluateIter(exp); // evaluate iteratively this time, instead of recursively
 	assert x == 7 + 3*5;
 	print "\nThe iteratively-computed value of Add(Value(7),Multiply(Value(3),Value(5))) is ";
 	print x;
-	
+	assert 2 > 1;
 	var postfix := ComputePostfix(exp);
 	print "\nThe postfix form of Add(Value(7),Multiply(Value(3),Value(5))) is ";
 	print postfix;
@@ -50,25 +49,30 @@ method Evaluate(exp: Expression) returns (val: int)
 // NO NEED to document the steps of refinement
 
 /****************************************************   combine triplets   **********************************************************/
-method EvaluateIter3(exp: Expression) returns (val: int)
+method EvaluateIter(exp: Expression) returns (val: int)
 	ensures val == ValueOf(exp)
 {
 	var PF: seq<Op> := ComputePostfix(exp);
 	var i: nat, res: int;
+
+	// assert (|PF|==1 || (|PF|>1 && exists i:nat :: 2<=i<|PF| && isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i])));
+	// assert numOfOperands(PF) > numOfOperators(PF);
+	LemmaMoreOperands(exp, PF);
+
 	while 1 < |PF|
 		invariant Inv30(exp, PF)
 		decreases |PF|
 	{	
+		LemmaSize(exp,PF);
 		ghost var PF0 := PF;
 		i := 2;
 		while i < |PF| && !(isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))
-		invariant 2 <= i <= |PF| 
+		invariant 2 <= i <= |PF| && (exists j:nat :: i<=j<|PF| && isOperand(PF[j-2]) && isOperand(PF[j-1]) && isOperator(PF[j]))
 		decreases |PF| - i
 		{
 			i := i+1;
 		}
-
-		LemmaI(PF, i);
+		LemmaI(exp, PF, i);
 		if PF[i] == Addition
 		{
 			res := getVal(PF[i-2]) + getVal(PF[i-1]);
@@ -81,16 +85,126 @@ method EvaluateIter3(exp: Expression) returns (val: int)
 		PF := PF[..i-2] + [Operand(res)] + PF[i+1..];
 		LemmaInv30(exp, PF0, PF, i, res);	
 	}
-	LemmaOperandLeft(PF);
+	//LemmaOperandLeft(PF);
 	val := getVal(PF[0]);
 }
+/*
 
-lemma {:verify false} LemmaOperandLeft(PF: seq<Op>)
-	requires |PF|==1
-	ensures isOperand(PF[0])
+// an example of proof by induction (even though Dafny is convinced with no need for proof)
+lemma RootLemma(i: nat)
+	ensures AncestorIndex(0, i)
+	decreases i
+{
+	if RootIndex(i)
+	{
+		// base case
+		assert i == 0;
+		assert AncestorIndex(0, 0);
+	}
+	else
+	{
+		assert !RootIndex(i);
+		assert i > 0;
+		assert AncestorIndex(0, i) by {
+			// definition of AncestorIndex for (0, i):
+			assert 0 == i || (i > 2*0 && AncestorIndex(0, Parent(i))) by {
+				assert i > 2*0;
+				// induction hypothesis
+				assert forall i' :: 0 <= i' < i ==> AncestorIndex(0, i') by {
+					forall i' | 0 <= i' < i ensures AncestorIndex(0, i') { RootLemma(i'); }
+				}
+				// the above assertion is not needed, Dafny already knows it! We will not recall it in subsequent inductive proofs;
+				// more specifically the above is true for i' being the parent of i
+				assert AncestorIndex(0, Parent(i)) by {
+					// this is the conclusion of the following recursive call to our lemma
+					RootLemma(Parent(i));
+					// and here's why the recursive call was justifiable:
+					// as mentioned above, "Parent(i)" is included in the induction hypothesis
+					assert 0 <= Parent(i) < i;
+					// technically, the variant of the recursive lemma is indeed decreased at each call, avoiding non-termination
+				}
+			}
+		}
+	}
+}
+*/
+lemma LemmaMoreOperands(exp: Expression, PF: seq<Op>)
+	requires PF == Postfix(exp)
+	ensures numOfOperands(PF) == 1 + numOfOperators(PF) //numOfOperands(PF) > numOfOperators(PF)
+	decreases PF, exp
+{
+	assert |PF| > 0;
+	if |PF| == 1
+	{
+		assert numOfOperands(PF) == 1;
+		assert numOfOperators(PF) == 0;
+		assert numOfOperands(PF) == 1 + numOfOperators(PF) == 1 + 0 == 1;
+	}
+	else
+	{
+		assert |PF| > 1;
+		assert isOperator(PF[|PF|-1]);
+		assert forall x:int :: true ==> exp != Value(x);
+		assert exists e1:Expression, e2:Expression :: (exp == Add(e1,e2) || (exp == Multiply(e1,e2)));
+		var e1:Expression,e2:Expression :| exp == Add(e1,e2 ) || exp == Multiply(e1,e2);
+		var PF1,PF2 := Postfix(e1),Postfix(e2);
+		assert 0 < |PF1| < |PF|;
+		assert 0 < |PF2| < |PF|; 
+		assert e1 < exp;
+		assert e2 < exp;
+		assert numOfOperands(Postfix(e1)) == 1 + numOfOperators(Postfix(e1)) by { LemmaMoreOperands(e1,PF1); }
+		assert numOfOperands(Postfix(e2)) == 1 + numOfOperators(Postfix(e2)) by { LemmaMoreOperands(e2,PF2); }
+
+	// induction hypothesis
+	assert forall  e:Expression ::0e<  exp ==>  numOfOperands(Postfix(e)) == 1 + numOfOperators(Postfix(e))by {
+	f	orall ie| 0e< iexpensures AnumOfOperands(Postfix(e)) == 1 + numOfOperators(Postfix(e)){ RLemmaMoreOperandsie,Postfix(e); }
+	}
+		
+	}
+}
+
+lemma ExpFromPostFix(exp:Expression,PF:seq<Op>)
+	requires PF == Postfix(exp) && |PF| > 1
+	ensures exists e1:Expression, e2:Expression :: (exp == Add(e1,e2) || exp == Multiply(e1,e2))
 {}
 
+/*
 
+lemma EquivalentGuards(a: array<int>, l: nat, h: nat, j: nat, left: nat, right: nat, A: multiset<int>)
+	requires Inv2(a[..], l, h, j, left, right, A)
+	ensures !hi(a[..], l, h, j) <==> HeapifyGuard(a, h, j, left, right)
+{
+	if right < h // both children are in the heap
+	{
+		calc {
+			HeapifyGuard(a, h, j, left, right);
+		== // by definition
+			(left < h && a[left] > a[j])	|| (right < h && a[right] > a[j]);
+		== { assert left < h && right < h; }
+			a[left] > a[j]	|| a[right] > a[j];
+		== { Lemma3a(a, l, h, j, left, right); }
+			!hi(a[..], l, h, j);
+		}
+	}
+	else if left < h // only the left child is in the heap
+	{
+		calc {
+			HeapifyGuard(a, h, j, left, right);
+		== // by definition of HeapifyGuard
+			(left < h && a[left] > a[j])	|| (right < h && a[right] > a[j]);
+		== { assert left < h && !(right < h); }
+			a[left] > a[j];
+		== { Lemma3b(a, l, h, j); }
+			!hi(a[..], l, h, j);
+		}
+	}
+	else // a leaf
+	{
+		assert !HeapifyGuard(a, h, j, left, right); // left and right are outside the heap (>= h)
+		assert hi(a[..], l, h, j); // vacuously true, as there are no children in scope
+	}
+}
+*/
 
 lemma {:verify false} LemmaInv30(exp: Expression, PF0: seq<Op>, PF: seq<Op>, i: nat, res: int)
 	requires 1 < |PF0| && Inv30(exp, PF0) && 2 <= i < |PF0|
@@ -100,18 +214,48 @@ lemma {:verify false} LemmaInv30(exp: Expression, PF0: seq<Op>, PF: seq<Op>, i: 
 	ensures Inv30(exp, PF)
 {}
 
-lemma {:verify false} LemmaI(PF: seq<Op>, i: nat)
-	requires 1 < |PF| && 2 <= i <= |PF|
-	requires exists e:Expression :: Postfix(e) == PF
-	ensures isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i])
+lemma LemmaSize(exp: Expression, PF: seq<Op>)
+	requires |PF| > 1 && Inv30(exp, PF)
+	ensures |PF| >= 3
 {}
-/**
-TODO: ensures that there is an i< |PF| which: operand,operand,operator
-	  ensures that there must be an operand,or maybe operand number > operator number.
- */
+
 predicate Inv30(exp: Expression, PF: seq<Op>)
 {
-	|PF| > 0 && (exists e:Expression :: Postfix(e) == PF && ValueOf(e) == ValueOf(exp))
+	|PF| > 0 &&
+	(exists e:Expression :: Postfix(e) == PF && ValueOf(e) == ValueOf(exp)) &&
+	(|PF|==1 || (|PF|>1 && exists i:nat :: 2<=i<|PF| && isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))) &&
+	numOfOperands(PF) > numOfOperators(PF)
+	// numOfOperands(PF) == 1 + numOfOperators(PF)
+	// exists i:nat :: 0<=i<|PF| && isOperand(PF[i])
+}
+lemma {:verify true} LemmaI(exp: Expression, PF: seq<Op>, i: nat)
+	requires |PF| >= 3 && Inv30(exp, PF) && 2 <= i < |PF|
+	requires i == |PF| || (isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))
+	ensures isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i])
+{}
+
+// lemma {:verify true} LemmaOperandLeft(PF: seq<Op>)
+// 	requires |PF|==1
+// 	ensures isOperand(PF[0])
+// {}
+
+function method numOfOperators(PF: seq<Op>) : int
+{
+	if |PF|==0 then 0 else
+	match PF[0]{
+		case Operand(x) => numOfOperands(PF[1..])
+		case Addition => 1 + numOfOperands(PF[1..])
+		case Multiplication => 1 + numOfOperands(PF[1..])
+	}
+}
+function method numOfOperands(PF: seq<Op>) : int
+{
+	if |PF|==0 then 0 else
+	match PF[0]{
+		case Operand(x) => 1 + numOfOperands(PF[1..])
+		case Addition => numOfOperands(PF[1..])
+		case Multiplication => numOfOperands(PF[1..])
+	}
 }
 predicate method isOperator(x: Op)
 {
@@ -130,57 +274,57 @@ function method getVal(x: Op) : int
 }
 
 /****************************************************   stack   **********************************************************/
-method EvaluateIter(exp: Expression) returns (val: int)
-	ensures val == ValueOf(exp)
-{
-	var PF: seq<Op> := ComputePostfix(exp);
-	var stack: seq<Op>, i: nat := [], 0;
+// method EvaluateIterStack(exp: Expression) returns (val: int)
+// 	ensures val == ValueOf(exp)
+// {
+// 	var PF: seq<Op> := ComputePostfix(exp);
+// 	var stack: seq<Op>, i: nat := [], 0;
 
-	while i != |PF|
-		invariant Inv31(exp, PF, stack, i)
-		decreases |PF| - i
-	{
-		ghost var stack0 := stack;
-		match PF[i]{
-			case Operand(x) => stack := stack + [PF[i]];
-			case Addition => Lemma2Elements(stack); stack := stack[..|stack|-2] + [Operand(getVal(stack[|stack|-2])+getVal(stack[|stack|-1]))];
-			case Multiplication => Lemma2Elements(stack); stack := stack[..|stack|-2] + [Operand(getVal(stack[|stack|-2])*getVal(stack[|stack|-1]))];
-		}
-		LemmaInv31(exp, PF, stack0, stack, i);
-		i := i+1;
-	}
-	Lemma1Element(stack);
-	LemmaPostCond(exp, PF, stack, i);
-	val := getVal(stack[0]);
-}
+// 	while i != |PF|
+// 		invariant Inv31(exp, PF, stack, i)
+// 		decreases |PF| - i
+// 	{
+// 		ghost var stack0 := stack;
+// 		match PF[i]{
+// 			case Operand(x) => stack := stack + [PF[i]];
+// 			case Addition => Lemma2Elements(stack); stack := stack[..|stack|-2] + [Operand(getVal(stack[|stack|-2])+getVal(stack[|stack|-1]))];
+// 			case Multiplication => Lemma2Elements(stack); stack := stack[..|stack|-2] + [Operand(getVal(stack[|stack|-2])*getVal(stack[|stack|-1]))];
+// 		}
+// 		LemmaInv31(exp, PF, stack0, stack, i);
+// 		i := i+1;
+// 	}
+// 	Lemma1Element(stack);
+// 	LemmaPostCond(exp, PF, stack, i);
+// 	val := getVal(stack[0]);
+// }
 
-predicate Inv31(exp: Expression, PF: seq<Op>, stack: seq<Op>, i: nat)
-{
-	0 <= i <= |PF| &&
-	(exists e:Expression :: ValueOf(e) == ValueOf(exp) && Postfix(e) == stack + PF[i..]) &&
-	(forall k:nat :: 0 <=k<|stack| ==> isOperand(stack[k]))//stack contains operands only
-}
+// predicate Inv31(exp: Expression, PF: seq<Op>, stack: seq<Op>, i: nat)
+// {
+// 	0 <= i <= |PF| &&
+// 	(exists e:Expression :: ValueOf(e) == ValueOf(exp) && Postfix(e) == stack + PF[i..]) &&
+// 	(forall k:nat :: 0 <=k<|stack| ==> isOperand(stack[k]))//stack contains operands only
+// }
 
-lemma {:verify false} LemmaPostCond(exp: Expression, PF: seq<Op>, stack: seq<Op>, i: nat)
-	requires |stack| == 1 && i == |PF| && Inv31(exp, PF, stack, i)
-	ensures getVal(stack[0]) == ValueOf(exp)
-{}
+// lemma {:verify true} LemmaPostCond(exp: Expression, PF: seq<Op>, stack: seq<Op>, i: nat)
+// 	requires |stack| == 1 && i == |PF| && Inv31(exp, PF, stack, i)
+// 	ensures getVal(stack[0]) == ValueOf(exp)
+// {}
 
-lemma {:verify false} LemmaInv31(exp: Expression, PF: seq<Op>, stack0: seq<Op>, stack: seq<Op>, i: nat)
-	requires Inv31(exp, PF, stack0, i) && i < |PF| && 
-	(stack == stack0 + [PF[i]] ||
-	stack == stack0[..|stack0|-2] + [Operand(getVal(stack0[|stack0|-2])+getVal(stack0[|stack0|-1]))] ||
-	stack == stack0[..|stack0|-2] + [Operand(getVal(stack0[|stack0|-2])*getVal(stack0[|stack0|-1]))])
-	ensures Inv31(exp, PF, stack, i+1)
-{}
+// lemma {:verify true} LemmaInv31(exp: Expression, PF: seq<Op>, stack0: seq<Op>, stack: seq<Op>, i: nat)
+// 	requires Inv31(exp, PF, stack0, i) && i < |PF| && 
+// 	(stack == stack0 + [PF[i]] ||
+// 	stack == stack0[..|stack0|-2] + [Operand(getVal(stack0[|stack0|-2])+getVal(stack0[|stack0|-1]))] ||
+// 	stack == stack0[..|stack0|-2] + [Operand(getVal(stack0[|stack0|-2])*getVal(stack0[|stack0|-1]))])
+// 	ensures Inv31(exp, PF, stack, i+1)
+// {}
 
-lemma {:verify false} Lemma1Element(stack: seq<Op>)
-	ensures |stack| == 1 
-{}
+// lemma {:verify true} Lemma1Element(stack: seq<Op>)
+// 	ensures |stack| == 1 
+// {}
 
-lemma {:verify false} Lemma2Elements(stack: seq<Op>)
-	ensures |stack| >= 2
-{}
+// lemma {:verify true} Lemma2Elements(stack: seq<Op>)
+// 	ensures |stack| >= 2
+// {}
 
 
 /****************************************************************************************************************************************************/

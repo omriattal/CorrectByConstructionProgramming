@@ -70,7 +70,7 @@ method HeapIncreaseKey4(a: array<int>, ghost A: seq<int> ,i: nat, key: int) retu
 	j,a[i] := i,key;
 }
 
-lemma LemmaAssignment2(a: array<int>, A: seq<int> ,i: nat, key: int)
+lemma LemmaAssignment2(a: array<int>, A: seq<int> ,i: nat, key:int)
 	requires i < a.Length && a[i] < key && hp(a[..]) && A == a[..] 
 	ensures Inv(a[..][i := key], A, i, key, i)
 {}
