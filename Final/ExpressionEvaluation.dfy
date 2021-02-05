@@ -44,7 +44,7 @@ method Evaluate(exp: Expression) returns (val: int)
 	}
 }
 
-// TODO: implement iteratively (not recursively), using a loop;
+// implement iteratively (not recursively), using a loop;
 // if it helps, feel free to use ComputePostfix or ComputePostfixIter;
 // NO NEED to document the steps of refinement
 
@@ -55,9 +55,8 @@ method EvaluateIter(exp: Expression) returns (val: int)
 	var PF: seq<Op> := ComputePostfix(exp);
 	var i: nat, res: int;
 
-	// assert (|PF|==1 || (|PF|>1 && exists i:nat :: 2<=i<|PF| && isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i])));
-	// assert numOfOperands(PF) > numOfOperators(PF);
 	LemmaMoreOperands(exp, PF);
+	LemmaExistsI(exp, PF);
 
 	while 1 < |PF|
 		invariant Inv30(exp, PF)
@@ -85,53 +84,135 @@ method EvaluateIter(exp: Expression) returns (val: int)
 		PF := PF[..i-2] + [Operand(res)] + PF[i+1..];
 		LemmaInv30(exp, PF0, PF, i, res);	
 	}
-	//LemmaOperandLeft(PF);
 	val := getVal(PF[0]);
 }
-/*
 
-// an example of proof by induction (even though Dafny is convinced with no need for proof)
-lemma RootLemma(i: nat)
-	ensures AncestorIndex(0, i)
-	decreases i
+// lemma {:verify true} ExistenceOfSubExpression(exp:Expression,PF:seq<Op>)
+// 	requires exists l:Expression,r:Expression :: exp==Add(l,r)||exp==Multiply(l,r)
+// 	ensures exists exp':Expression :: SubExpression(exp',exp) && isBasic(exp') 
+// {
+// 	// Due to Expression definition and that exp is finite.
+// 	var l,r :| exp==Add(l,r) || exp==Multiply(l,r);
+// 	assert exists exp':Expression :: SubExpression(exp', exp) by {
+// 		assert SubExpression(l,exp);
+// 	}
+// }
+
+predicate SubExpression(sub: Expression, exp: Expression)
 {
-	if RootIndex(i)
+	sub == exp || (exists l:Expression,r:Expression :: (exp==Add(l,r)||exp==Multiply(l,r)) && (SubExpression(sub,l)||SubExpression(sub,r)) ) 
+}
+
+predicate isBasic(exp:Expression)
+{
+	exists n1:int,n2:int :: exp == Add(Value(n1),Value(n2)) || exp == Multiply(Value(n1),Value(n2))
+}
+
+lemma {:verify false} LemmaExistsI(exp: Expression, PF: seq<Op>)
+	requires PF == Postfix(exp) 
+	ensures |PF| == 1 || (|PF|>1 && exists i:nat :: 2<=i<|PF| && isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))
+{
+	//TODO: easy to see? if not, help us to prove by contradiction
+	// Because exp is finite there is an expression, denote it as exp' s.t SubExpression(exp',exp) and isBasic(exp')
+	// Denote PF' = Postfix(exp'), therefore PF' == [Operand,Operand,Operator] and PF' is a sub-seq of PF by definition of Postfix.
+
+	if |PF| == 1
 	{
-		// base case
-		assert i == 0;
-		assert AncestorIndex(0, 0);
+		assert |PF| == 1;
+	}
+	else //|PF|>1
+	{
+		assert |PF| > 2;
+		assert isOperator(PF[|PF|-1]); 
+		assert exists l,r :: exp==Add(l,r)||exp==Multiply(l,r);
+
+		// assert exists exp':Expression :: SubExpression(exp',exp) && isBasic(exp') by { ExistenceOfSubExpression(exp, PF); } 
+		// var exp':Expression :| SubExpression(exp',exp) && isBasic(exp');
+		// var n1:int,n2:int :| exp' == Add(Value(n1),Value(n2)) || exp' == Multiply(Value(n1),Value(n2));
+		// var PF' := Postfix(exp');
+		// assert PF' == [Operand(n1),Operand(n2),Addition] || PF' == [Operand(n1),Operand(n2),Multiplication];
+		// assert exists i: nat:: i < |PF|-3 && PF' == PF[i..i+3];
+
+		// assert exists i:nat :: 2<=i<|PF| && isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]) by{
+		// 	calc{
+		// 		forall i:nat :: 2<=i<|PF| && !(isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))
+		// 	==> //{ LemmaNoConsecutiveOperands(exp, PF); }
+		// 		forall j:nat :: 0 <= j <|PF|-1 ==> !isOperand(PF[j]) || !isOperand(PF[j+1]) 
+		// 	==>
+		// 		numOfOperands(PF) <= numOfOperators(PF); 
+		// 	}
+		// }
+	}
+}
+
+predicate NoConsecutiveOperands(PF: seq<Op>)
+{
+	forall j:nat :: 0 <= j <|PF|-1 ==> !isOperand(PF[j]) || !isOperand(PF[j+1])
+}
+
+lemma {:verify true} LemmaNoConsecutiveOperands(exp: Expression, PF: seq<Op>)
+	requires PF == Postfix(exp) 
+	requires forall i:nat :: 2<=i<|PF| ==> !(isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))
+	ensures NoConsecutiveOperands(PF)
+	decreases exp,PF
+{
+	if |PF| < 3
+	{
+		assert |PF|==1;
+		assert NoConsecutiveOperands(PF);
+	}
+	else if |PF| == 3
+	{
+		assert isOperator(PF[2]);
+		assert forall i:nat :: 2<=i<|PF| ==> !(isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]));
+		//==>
+		assert !isOperand(PF[0]) || !isOperand(PF[1]);
+		//==> 
+		assert NoConsecutiveOperands(PF);
 	}
 	else
 	{
-		assert !RootIndex(i);
-		assert i > 0;
-		assert AncestorIndex(0, i) by {
-			// definition of AncestorIndex for (0, i):
-			assert 0 == i || (i > 2*0 && AncestorIndex(0, Parent(i))) by {
-				assert i > 2*0;
-				// induction hypothesis
-				assert forall i' :: 0 <= i' < i ==> AncestorIndex(0, i') by {
-					forall i' | 0 <= i' < i ensures AncestorIndex(0, i') { RootLemma(i'); }
-				}
-				// the above assertion is not needed, Dafny already knows it! We will not recall it in subsequent inductive proofs;
-				// more specifically the above is true for i' being the parent of i
-				assert AncestorIndex(0, Parent(i)) by {
-					// this is the conclusion of the following recursive call to our lemma
-					RootLemma(Parent(i));
-					// and here's why the recursive call was justifiable:
-					// as mentioned above, "Parent(i)" is included in the induction hypothesis
-					assert 0 <= Parent(i) < i;
-					// technically, the variant of the recursive lemma is indeed decreased at each call, avoiding non-termination
-				}
-			}
+		// induction hypothesis 
+		var e1:Expression,e2:Expression :| exp == Add(e1,e2 ) || exp == Multiply(e1,e2);
+		var PF1,PF2 := Postfix(e1),Postfix(e2);
+		assert isOperator(PF1[|PF1|-1]); 
+		assert isOperand(PF2[|PF2|-1]);
+		assert isOperator(PF2[|PF2|-1]); 
+		assert 0 < |PF1| < |PF|;
+		assert 0 < |PF2| < |PF|; 
+		assert e1 < exp;
+		assert e2 < exp;
+		var last:Op :| PF == PF1+PF2+[last];
+		assert PF == PF1 + PF2 + [last];
+		assert forall i:nat :: 2<=i<|PF1| ==> !(isOperand(PF1[i-2]) && isOperand(PF1[i-1]) && isOperator(PF1[i])) by{
+			assert PF == PF1 + PF2 + [last];
+			assert forall i:nat :: 2<=i<|PF| ==> !(isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]));
+			assert forall i:nat :: 2<=i<|PF1| ==> !(isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]));
+			assert forall i:nat :: 0<=i<|PF1| ==> isOperand(PF[i]) == isOperand(PF1[i]);
 		}
+
+		assume forall i:nat :: 2<=i<|PF2| ==> !(isOperand(PF2[i-2]) && isOperand(PF2[i-1]) && isOperator(PF2[i]));
+		// assert forall i:nat :: 2<=i<|PF2| ==> !(isOperand(PF2[i-2]) && isOperand(PF2[i-1]) && isOperator(PF2[i])) by{
+		// 	assert PF == PF1 + PF2 + [last];
+		// 	assert forall i:nat :: 2<=i<|PF| ==> !(isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]));
+		// 	assert forall i:nat :: 2+|PF1|<=i<|PF2| ==> !(isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]));
+		// 	assert forall i:nat :: 0<=i< |PF2| ==> isOperand(PF[i+|PF1|]) == isOperand(PF2[i]);
+		// }
+		
+		assert NoConsecutiveOperands(PF1) by { LemmaNoConsecutiveOperands(e1, PF1); }
+		assert NoConsecutiveOperands(PF2) by { LemmaNoConsecutiveOperands(e2, PF2); }
+		assert isOperator(PF[|PF|-1]); 
+		assert PF == PF1 + PF2 + [last];
+		assert isOperator(PF2[|PF2|-1]);
+		//==>
+		assert NoConsecutiveOperands(PF);
 	}
 }
-*/
+
 lemma LemmaMoreOperands(exp: Expression, PF: seq<Op>)
 	requires PF == Postfix(exp)
-	ensures numOfOperands(PF) == 1 + numOfOperators(PF) //numOfOperands(PF) > numOfOperators(PF)
-	decreases PF, exp
+	ensures numOfOperands(PF) == 1 + numOfOperators(PF) 
+	decreases exp, PF
 {
 	assert |PF| > 0;
 	if |PF| == 1
@@ -152,67 +233,63 @@ lemma LemmaMoreOperands(exp: Expression, PF: seq<Op>)
 		assert 0 < |PF2| < |PF|; 
 		assert e1 < exp;
 		assert e2 < exp;
-		assert numOfOperands(Postfix(e1)) == 1 + numOfOperators(Postfix(e1)) by { LemmaMoreOperands(e1,PF1); }
-		assert numOfOperands(Postfix(e2)) == 1 + numOfOperators(Postfix(e2)) by { LemmaMoreOperands(e2,PF2); }
-
-	// induction hypothesis
-	assert forall  e:Expression ::0e<  exp ==>  numOfOperands(Postfix(e)) == 1 + numOfOperators(Postfix(e))by {
-	f	orall ie| 0e< iexpensures AnumOfOperands(Postfix(e)) == 1 + numOfOperators(Postfix(e)){ RLemmaMoreOperandsie,Postfix(e); }
-	}
 		
+		// induction hypothesis 
+		// Dafny has a bug .. couldn't understand with decreases PF, exp but did understand with decreases exp, PF
+		assert numOfOperands(PF1) == 1 + numOfOperators(PF1) by { LemmaMoreOperands(e1,PF1); }
+		assert numOfOperands(PF2) == 1 + numOfOperators(PF2) by { LemmaMoreOperands(e2,PF2); }
+		
+		//for the reader:
+		// var last:Op :| PF == PF1+PF2+[last];
+		// assert numOfOperands(PF) == numOfOperands(PF1+PF2+[last]) == 
+		// 	      numOfOperands(PF1) + numOfOperands(PF2) + numOfOperands([last]) == (by i.h)
+		//        1 + numOfOperators(PF1) + 1 + numOfOperators(PF2) + 0 ==
+		// 	      2 + (numOfOperators(PF)-1) == 
+		// 	      1 + numOfOperators(PF) ;
 	}
 }
+
+// lemma {: verify true}LemmaSameNumOfOperands(PF:seq<Op>, PF1:seq<Op>, PF2:seq<Op>)
+// 	requires PF == PF1+PF2
+// 	ensures numOfOperands(PF) == numOfOperands(PF1) + numOfOperands(PF2)
+// {}
 
 lemma ExpFromPostFix(exp:Expression,PF:seq<Op>)
 	requires PF == Postfix(exp) && |PF| > 1
 	ensures exists e1:Expression, e2:Expression :: (exp == Add(e1,e2) || exp == Multiply(e1,e2))
 {}
 
-/*
-
-lemma EquivalentGuards(a: array<int>, l: nat, h: nat, j: nat, left: nat, right: nat, A: multiset<int>)
-	requires Inv2(a[..], l, h, j, left, right, A)
-	ensures !hi(a[..], l, h, j) <==> HeapifyGuard(a, h, j, left, right)
-{
-	if right < h // both children are in the heap
-	{
-		calc {
-			HeapifyGuard(a, h, j, left, right);
-		== // by definition
-			(left < h && a[left] > a[j])	|| (right < h && a[right] > a[j]);
-		== { assert left < h && right < h; }
-			a[left] > a[j]	|| a[right] > a[j];
-		== { Lemma3a(a, l, h, j, left, right); }
-			!hi(a[..], l, h, j);
-		}
-	}
-	else if left < h // only the left child is in the heap
-	{
-		calc {
-			HeapifyGuard(a, h, j, left, right);
-		== // by definition of HeapifyGuard
-			(left < h && a[left] > a[j])	|| (right < h && a[right] > a[j]);
-		== { assert left < h && !(right < h); }
-			a[left] > a[j];
-		== { Lemma3b(a, l, h, j); }
-			!hi(a[..], l, h, j);
-		}
-	}
-	else // a leaf
-	{
-		assert !HeapifyGuard(a, h, j, left, right); // left and right are outside the heap (>= h)
-		assert hi(a[..], l, h, j); // vacuously true, as there are no children in scope
-	}
-}
-*/
-
-lemma {:verify false} LemmaInv30(exp: Expression, PF0: seq<Op>, PF: seq<Op>, i: nat, res: int)
+lemma {:verify true} LemmaInv30(exp: Expression, PF0: seq<Op>, PF: seq<Op>, i: nat, res: int)
 	requires 1 < |PF0| && Inv30(exp, PF0) && 2 <= i < |PF0|
 	requires isOperand(PF0[i-2]) && isOperand(PF0[i-1]) && isOperator(PF0[i])
 	requires (PF0[i] == Addition && res == getVal(PF0[i-2]) + getVal(PF0[i-1])) || (PF0[i] == Multiplication && res == getVal(PF0[i-2]) * getVal(PF0[i-1]))
 	requires PF == PF0[..i-2] + [Operand(res)] + PF0[i+1..]
 	ensures Inv30(exp, PF)
-{}
+{
+	assert |PF| > 0;
+	assert numOfOperands(PF) == 1 + numOfOperators(PF);
+	assert (exists e:Expression :: Postfix(e) == PF && ValueOf(e) == ValueOf(exp)) by{
+		LemmaSameValue(exp, PF0, PF, i, res);
+	}
+	var e:Expression :| Postfix(e) == PF && ValueOf(e) == ValueOf(exp);
+	assert (|PF|==1 || (|PF|>1 && exists i:nat :: 2<=i<|PF| && isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))) by{
+		LemmaExistsI(e, PF);
+	}
+	
+}
+
+lemma {: verify false} LemmaSameValue(exp: Expression, PF0: seq<Op>, PF: seq<Op>, i: nat, res: int)
+	requires 1 < |PF0| && Inv30(exp, PF0) && 2 <= i < |PF0|
+	requires isOperand(PF0[i-2]) && isOperand(PF0[i-1]) && isOperator(PF0[i])
+	requires (PF0[i] == Addition && res == getVal(PF0[i-2]) + getVal(PF0[i-1])) || (PF0[i] == Multiplication && res == getVal(PF0[i-2]) * getVal(PF0[i-1]))
+	requires PF == PF0[..i-2] + [Operand(res)] + PF0[i+1..]
+	ensures exists e:Expression :: Postfix(e) == PF && ValueOf(e) == ValueOf(exp)
+{
+	//TODO::check later wait for breakthrough
+	/* for simplicity:: denote exp == Add(2,Add(2,3)) then PF0 == Postfix(exp) = [2,2,3,Addition,Addition] and PF == [2,5,Addition] 
+	==> exists e == Add(2,5) and we can see that PF=Postfix(e) and also ValueOf(e) == ValueOf(exp)
+	*/  
+}
 
 lemma LemmaSize(exp: Expression, PF: seq<Op>)
 	requires |PF| > 1 && Inv30(exp, PF)
@@ -224,20 +301,13 @@ predicate Inv30(exp: Expression, PF: seq<Op>)
 	|PF| > 0 &&
 	(exists e:Expression :: Postfix(e) == PF && ValueOf(e) == ValueOf(exp)) &&
 	(|PF|==1 || (|PF|>1 && exists i:nat :: 2<=i<|PF| && isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))) &&
-	numOfOperands(PF) > numOfOperators(PF)
-	// numOfOperands(PF) == 1 + numOfOperators(PF)
-	// exists i:nat :: 0<=i<|PF| && isOperand(PF[i])
+	numOfOperands(PF) == 1 + numOfOperators(PF)
 }
 lemma {:verify true} LemmaI(exp: Expression, PF: seq<Op>, i: nat)
 	requires |PF| >= 3 && Inv30(exp, PF) && 2 <= i < |PF|
 	requires i == |PF| || (isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i]))
 	ensures isOperand(PF[i-2]) && isOperand(PF[i-1]) && isOperator(PF[i])
 {}
-
-// lemma {:verify true} LemmaOperandLeft(PF: seq<Op>)
-// 	requires |PF|==1
-// 	ensures isOperand(PF[0])
-// {}
 
 function method numOfOperators(PF: seq<Op>) : int
 {
@@ -340,7 +410,7 @@ function Postfix(exp: Expression): seq<Op>
 		case Multiply(l,r) => Postfix(l)+Postfix(r)+[Multiplication]
 	}
 }
-// TODO: implement and document ALL steps of refinement (REC)
+// implement and document ALL steps of refinement (REC)
 method ComputePostfix(exp: Expression) returns (res: seq<Op>)
 	ensures res == Postfix(exp)
 	decreases exp,10
@@ -550,7 +620,7 @@ lemma Lemma9Post(exp: Expression, l:Expression, r:Expression,res:seq<Op>,postFix
 /****************************************************************************************************************************************************/
 
 
-// TODO: complete the implementation (of LoopBody below) and the verification
+// complete the implementation (of LoopBody below) and the verification
 // (by providing a body to Inv, V, LemmaInit, and LemmaPost below);
 // NO NEED to document the steps of refinement
 method ComputePostfixIter(exp: Expression) returns (res: seq<Op>)
