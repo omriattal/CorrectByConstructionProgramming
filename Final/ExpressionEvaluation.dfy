@@ -85,6 +85,14 @@ method EvaluateIter(exp: Expression) returns (val: int)
 		PF := PF[..i-2] + [Operand(res)] + PF[i+1..];
 		LemmaInv30(exp, PF0, PF, i, res);	
 	}
+	assert |PF| == 1;
+	assert Inv30(exp, PF);
+	assert numOfOperands(PF) == 1 + numOfOperators(PF);
+	
+	assert numOfOperands(PF) + numOfOperators(PF) == 1;
+	assert numOfOperands(PF) == 1;
+
+	assert numOfOperands(PF) == 1;
 	val := getVal(PF[0]);
 }
 lemma LemmaExistsI(exp: Expression, PF: seq<Op>)
@@ -177,6 +185,37 @@ lemma LemmaMoreOperands(exp: Expression, PF: seq<Op>)
 		assert numOfOperands(PF1) == 1 + numOfOperators(PF1) by { LemmaMoreOperands(e1,PF1); }
 		assert numOfOperands(PF2) == 1 + numOfOperators(PF2) by { LemmaMoreOperands(e2,PF2); }
 		
+		var last:Op :| PF == PF1+PF2+[last];
+		assert PF == PF1 + PF2 + [last];
+
+		var PF' := PF1 + PF2;
+		assert PF == PF' + [last];
+		
+		assert isOperator(last);
+		assert numOfOperands(PF) == numOfOperands(PF1+PF2+[last]);
+		assert numOfOperands(PF') == numOfOperands(PF1) + numOfOperands(PF2) by {
+			LemmaLinear1(PF',PF1,PF2);
+		}
+		assert numOfOperands(PF) == numOfOperands(PF1) + numOfOperands(PF2) + numOfOperands([last]) by {
+			LemmaLinear1(PF,PF',[last]);
+		}
+		
+		assert numOfOperands([last]) == 0;
+		assert numOfOperands(PF) == numOfOperands(PF1) + numOfOperands(PF2);
+		assert numOfOperands(PF) == 1 + numOfOperators(PF1) + 1 + numOfOperators(PF2);
+		assert numOfOperands(PF) == 2 + numOfOperators(PF1) + numOfOperators(PF2);
+		
+		assert PF == PF1 + PF2 + [last];
+		assert numOfOperators(PF') == numOfOperators(PF1) + numOfOperators(PF2) by {
+			LemmaLinear2(PF',PF1,PF2);
+		}
+		assert numOfOperators(PF) == numOfOperators(PF') + numOfOperators([last]) by {
+			LemmaLinear2(PF,PF',[last]);
+		}
+		assert numOfOperators(PF) == numOfOperators(PF1) + numOfOperators(PF2) + numOfOperators([last]);
+		assert numOfOperators([last]) == 1;
+		assert numOfOperators(PF)-1 == numOfOperators(PF1) + numOfOperators(PF2);
+		assert numOfOperands(PF) == 2 + numOfOperators(PF)-1;
 		// FOR THE READER:
 		// var last:Op :| PF == PF1+PF2+[last];
 		// assert numOfOperands(PF) == numOfOperands(PF1+PF2+[last]) == 
@@ -187,6 +226,59 @@ lemma LemmaMoreOperands(exp: Expression, PF: seq<Op>)
 	}
 }
 
+lemma LemmaLinear1(PF: seq<Op>, PF1: seq<Op>, PF2: seq<Op>)
+	requires PF == PF1 + PF2
+	ensures numOfOperands(PF) == numOfOperands(PF1) + numOfOperands(PF2)
+	decreases |PF|
+{
+	if |PF| == 0//base
+	{
+		assert |PF1| == |PF2| == 0;
+		assert numOfOperands(PF) == numOfOperands(PF1) + numOfOperands(PF2) == 0;
+	}
+	else
+	{
+		if |PF1| == 0
+		{
+			assert numOfOperands(PF1) == 0;
+			assert PF == PF2;
+			assert numOfOperands(PF) == numOfOperands(PF1) + numOfOperands(PF2);
+		}
+		else 
+		{
+			assert |PF1| > 0;
+			// induction hypothesis
+			assert numOfOperands(PF[1..]) == numOfOperands(PF1[1..]) + numOfOperands(PF2) by {LemmaLinear1(PF[1..], PF1[1..],PF2);}
+		} 		
+	}
+}
+
+lemma LemmaLinear2(PF: seq<Op>, PF1: seq<Op>, PF2: seq<Op>)
+	requires PF == PF1 + PF2
+	ensures numOfOperators(PF) == numOfOperators(PF1) + numOfOperators(PF2)
+	decreases |PF|
+{
+	if |PF| == 0//base
+	{
+		assert |PF1| == |PF2| == 0;
+		assert numOfOperators(PF) == numOfOperators(PF1) + numOfOperators(PF2) == 0;
+	}
+	else
+	{
+		if |PF1| == 0
+		{
+			assert numOfOperators(PF1) == 0;
+			assert PF == PF2;
+			assert numOfOperators(PF) == numOfOperators(PF1) + numOfOperators(PF2);
+		}
+		else 
+		{
+			assert |PF1| > 0;
+			// induction hypothesis
+			assert numOfOperators(PF[1..]) == numOfOperators(PF1[1..]) + numOfOperators(PF2) by {LemmaLinear2(PF[1..], PF1[1..],PF2);}
+		} 		
+	}
+}
 lemma ExpFromPostFix(exp:Expression,PF:seq<Op>)
 	requires PF == Postfix(exp) && |PF| > 1
 	ensures exists e1:Expression, e2:Expression :: (exp == Add(e1,e2) || exp == Multiply(e1,e2))
@@ -200,7 +292,135 @@ lemma LemmaInv30(exp: Expression, PF0: seq<Op>, PF: seq<Op>, i: nat, res: int)
 	ensures Inv30(exp, PF)
 {
 	assert |PF| > 0;
-	assert numOfOperands(PF) == 1 + numOfOperators(PF);
+	assert numOfOperands(PF) == 1 + numOfOperators(PF) by{
+		assert PF == PF0[..i-2] + [Operand(res)] + PF0[i+1..];
+		
+		assert numOfOperands(PF0) == 1 + numOfOperators(PF0);
+		//&&
+		assert numOfOperands(PF0[i-2..i+1]) == 2 by {
+			var PF0' := [PF0[i-2]] + [PF0[i-1]];
+			assert numOfOperands(PF0') == numOfOperands([PF0[i-2]]) + numOfOperands([PF0[i-1]]) by {
+				LemmaLinear1(PF0',[PF0[i-2]],[PF0[i-1]]);
+			}
+			assert numOfOperands([PF0[i-2]]) == 1;
+			assert numOfOperands([PF0[i-1]]) == 1;
+			assert numOfOperands(PF0') == 2;
+			assert numOfOperands([PF0[i]]) == 0;
+			assert numOfOperands(PF0[i-2..i+1]) == numOfOperands(PF0') + numOfOperands([PF0[i]]) by {
+				LemmaLinear1(PF0[i-2..i+1],PF0',[PF0[i]]);
+			}
+			assert isOperand(PF0[i-2]) && isOperand(PF0[i-1]) && isOperator(PF0[i]);
+		}
+		//&&
+		assert numOfOperators(PF0[i-2..i+1]) == 1 by {
+			var PF0' := [PF0[i-2]] + [PF0[i-1]];
+				assert numOfOperators(PF0') == numOfOperators([PF0[i-2]]) + numOfOperators([PF0[i-1]]) by {
+				LemmaLinear2(PF0',[PF0[i-2]],[PF0[i-1]]);
+			}
+			assert numOfOperators([PF0[i-2]]) == 0;
+			assert numOfOperators([PF0[i-1]]) == 0;
+			assert numOfOperators(PF0') == 0;
+			assert numOfOperators([PF0[i]]) == 1;
+			assert numOfOperators(PF0[i-2..i+1]) == numOfOperators(PF0') + numOfOperators([PF0[i]]) by {
+				LemmaLinear2(PF0[i-2..i+1],PF0',[PF0[i]]);
+			}
+		}
+		
+		assert PF == PF0[..i-2] + [Operand(res)] + PF0[i+1..];
+		assert numOfOperands([Operand(res)]) == 1;
+		assert numOfOperators([Operand(res)]) == 0;
+
+		assert numOfOperands(PF) == numOfOperands(PF0[..i-2] + [Operand(res)] + PF0[i+1..]) == numOfOperands(PF0[..i-2]) + numOfOperands([Operand(res)]) + numOfOperands(PF0[i+1..]) by {
+			var PF0' := PF0[..i-2] + [Operand(res)];
+			assert numOfOperands(PF0')  == numOfOperands(PF0[..i-2]) + numOfOperands([Operand(res)]) by {
+				LemmaLinear1(PF0',PF0[..i-2],[Operand(res)]);
+			}
+			assert PF == PF0' + PF0[i+1..];
+			assert numOfOperands(PF) == numOfOperands(PF0') + numOfOperands(PF0[i+1..]) by {
+				LemmaLinear1(PF,PF0',PF0[i+1..]);
+			}
+		}
+		assert numOfOperands(PF0[..i-2]) + numOfOperands([Operand(res)]) + numOfOperands(PF0[i+1..]) 
+		== numOfOperands(PF0[..i-2]) + 1 + numOfOperands(PF0[i+1..]) 
+		== 1 + numOfOperands(PF0[..i-2] + PF0[i+1..]) by {
+			LemmaLinear1(PF0[..i-2] + PF0[i+1..],PF0[..i-2],PF0[i+1..]);
+		}
+		assert numOfOperands(PF0[..i-2]) + 1 + numOfOperands(PF0[i+1..])  == 1 + numOfOperators(PF) by {
+
+			assert numOfOperands(PF0) == 1 + numOfOperators(PF0);
+
+			assert numOfOperands(PF0[i-2..i+1]) == 2;
+			assert numOfOperators(PF0[i-2..i+1]) == 1;
+			assert numOfOperands(PF0[i-2..i+1]) == numOfOperators(PF0[i-2..i+1]) + 1;
+
+			assert numOfOperands(PF0[..i-2] + PF0[i+1..]) == numOfOperators(PF0[..i-2] + PF0[i+1..])by{
+				assert numOfOperands(PF0) == 1 + numOfOperators(PF0);
+
+				assert numOfOperands(PF0[i-2..i+1]) == 2;
+				assert numOfOperators(PF0[i-2..i+1]) == 1;
+				assert numOfOperands(PF0[i-2..i+1]) == numOfOperators(PF0[i-2..i+1]) + 1;
+
+				assert 2 + numOfOperands(PF0[..i-2] + PF0[i+1..]) == numOfOperands(PF0) by {
+					assert PF0 == PF0[..i-2] + PF0[i-2..i+1] + PF0[i+1..];
+					var PF0' :=  PF0[..i-2] + PF0[i-2..i+1];
+					assert numOfOperands(PF0') == numOfOperands(PF0[..i-2]) + numOfOperands(PF0[i-2..i+1]) by {
+						LemmaLinear1(PF0',PF0[..i-2],PF0[i-2..i+1]);
+					}
+					assert numOfOperands(PF0[..i-2]) + numOfOperands(PF0[i-2..i+1]) == 2 +  numOfOperands(PF0[..i-2]);
+					assert numOfOperands(PF0) == numOfOperands(PF0') + numOfOperands(PF0[i+1..]) by {
+						LemmaLinear1(PF0,PF0',PF0[i+1..]);
+					}
+				}
+				assert 1 + numOfOperators(PF0[..i-2] + PF0[i+1..]) == numOfOperators(PF0) by {
+					assert PF0 == PF0[..i-2] + PF0[i-2..i+1] + PF0[i+1..];
+					var PF0' :=  PF0[..i-2] + PF0[i-2..i+1];
+					assert numOfOperators(PF0') == numOfOperators(PF0[..i-2]) + numOfOperators(PF0[i-2..i+1]) by {
+						LemmaLinear2(PF0',PF0[..i-2],PF0[i-2..i+1]);
+					}
+					assert numOfOperators(PF0') == numOfOperators(PF0[..i-2]) + numOfOperators(PF0[i-2..i+1]) 
+					== 1 +  numOfOperators(PF0[..i-2]);
+					assert numOfOperators(PF0) == numOfOperators(PF0') + numOfOperators(PF0[i+1..]) by {
+						LemmaLinear2(PF0,PF0',PF0[i+1..]);
+					}
+					assert numOfOperators(PF0) == numOfOperators(PF0') + numOfOperators(PF0[i+1..]) 
+					== 1 +  numOfOperators(PF0[..i-2]) + numOfOperators(PF0[i+1..])
+					== 1 +  numOfOperators(PF0[..i-2] + PF0[i+1..]) by {
+						assert numOfOperators(PF0[..i-2] + PF0[i+1..]) == numOfOperators(PF0[..i-2]) + numOfOperators(PF0[i+1..]) by {
+							LemmaLinear2(PF0[..i-2] + PF0[i+1..],PF0[..i-2],PF0[i+1..]);
+						}
+					}
+				}
+			}
+
+			assert numOfOperators(PF0[..i-2] + PF0[i+1..]) == numOfOperators(PF) by{
+				assert PF == PF0[..i-2] + [Operand(res)] + PF0[i+1..];
+				assert numOfOperators(PF) == numOfOperators(PF0[..i-2] + [Operand(res)] + PF0[i+1..]);
+				
+				assert numOfOperators(PF) == numOfOperators(PF0[..i-2]) + numOfOperators([Operand(res)]) + numOfOperators(PF0[i+1..]) by {
+					assert PF == PF0[..i-2]+[Operand(res)]+PF0[i+1..];
+					var PF' := PF0[..i-2]+[Operand(res)];
+					assert numOfOperators(PF') == numOfOperators(PF0[..i-2]) + numOfOperators([Operand(res)]) by {
+						LemmaLinear2(PF',PF0[..i-2],[Operand(res)]);
+					}
+					assert numOfOperators(PF) == numOfOperators(PF') + numOfOperators(PF0[i+1..]) by {
+						LemmaLinear2(PF,PF',PF0[i+1..]);
+					}
+				}
+				assert numOfOperators([Operand(res)]) == 0;
+				//==>
+				assert numOfOperators(PF) == numOfOperators(PF0[..i-2]) + numOfOperators(PF0[i+1..]);
+				
+				assert numOfOperators(PF0[..i-2] + PF0[i+1..]) == numOfOperators(PF0[..i-2]) + numOfOperators(PF0[i+1..]) by {
+						LemmaLinear2(PF0[..i-2] + PF0[i+1..],PF0[..i-2],PF0[i+1..]);
+				}
+			}
+
+			assert PF == PF0[..i-2] + [Operand(res)] + PF0[i+1..];
+			assert numOfOperators([Operand(res)]) == 0;
+		
+		}
+	}
+
 	assert (exists e:Expression :: Postfix(e) == PF && ValueOf(e) == ValueOf(exp)) by{
 		LemmaSameValue(exp, PF0, PF, i, res);
 	}
@@ -244,9 +464,9 @@ function method numOfOperators(PF: seq<Op>) : int
 {
 	if |PF|==0 then 0 else
 	match PF[0]{
-		case Operand(x) => numOfOperands(PF[1..])
-		case Addition => 1 + numOfOperands(PF[1..])
-		case Multiplication => 1 + numOfOperands(PF[1..])
+		case Operand(x) => numOfOperators(PF[1..])
+		case Addition => 1 + numOfOperators(PF[1..])
+		case Multiplication => 1 + numOfOperators(PF[1..])
 	}
 }
 function method numOfOperands(PF: seq<Op>) : int
